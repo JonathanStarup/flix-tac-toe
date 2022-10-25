@@ -1,13 +1,13 @@
 use String.{lineSeparator => newline}
 
-type alias MenuItem = {name = String}
+type alias MenuItem = {name = String, action = Unit -> Unit \ IO}
 
-def menuItem(name: String): MenuItem = {name = name}
+def wip(): Unit \ IO = println("WIP")
 
 def menuItems(): List[MenuItem] =
-    menuItem("play") ::
-    menuItem("menu") ::
-    menuItem("quit") ::
+    {name = "play", action = wip} ::
+    {name = "menu", action = wip} ::
+    {name = "quit", action = wip} ::
     Nil
 
 def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
