@@ -1,3 +1,9 @@
+use Applicative.point
+use Foldable.findLeft
+use Foldable.join
+use Functor.map
+use Monad.flatMap
+use Option.getWithDefault
 use String.{lineSeparator => newline}
 
 enum Action {
@@ -26,7 +32,7 @@ def matchMenuItem(s: String, item: MenuItem): Bool = {
 }
 
 def matchOnItems(items: List[MenuItem], s: String): Option[MenuItem] = {
-    List.findLeft(matchMenuItem(s), items)
+    findLeft(matchMenuItem(s), items)
 }
 
 def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
@@ -37,19 +43,19 @@ def boxLines(padding: {padding = Int32}, lines: List[String]): List[String] = {
     let pad = String.repeat(padding.padding, " ");
     // this is an upper bound if colors are present.
     let maxLine = lines |>
-        List.map(String.length) |>
+        map(String.length) |>
         List.maximum |>
-        Option.getWithDefault(0);
+        getWithDefault(0);
     let barLength = maxLine + 2 * padding.padding + 1;
-    let barredLines = lines |> List.map(line -> "|${pad}${line}");
+    let barredLines = lines |> map(line -> "|${pad}${line}");
     let bar = "|${String.repeat(barLength - 1, "-")}";
-    bar :: (barredLines `List.append` (List.point(bar)))
+    bar :: (barredLines `List.append` (point(bar)))
 }
 
 def menuString(menu: List[MenuItem]): String = {
-    let menuLine = List.join("  ", List.map(i -> i.name, menu));
-    let boxLines = boxLines(padding = 2, List.point(menuLine));
-    newline() + List.join(newline(), boxLines)
+    let menuLine = join("  ", map(i -> i.name, menu));
+    let boxLines = boxLines(padding = 2, point(menuLine));
+    newline() + join(newline(), boxLines)
 }
 
 def getInput(): Option[String] \ IO = {
@@ -58,24 +64,21 @@ def getInput(): Option[String] \ IO = {
 }
 
 def getMenuInput(menu: List[MenuItem]): Option[MenuItem] \ IO = {
-    getInput() |>
-        Option.flatMap(matchOnItems(menu))
+    flatMap(matchOnItems(menu), getInput())
 }
 
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
-    mainLoop(menuItems())
+    menuLoop(menuItems())
 }
 
-def mainLoop(menu: List[MenuItem]): Unit \ IO = {
-    def loop() = mainLoop(menu);
+def menuLoop(menu: List[MenuItem]): Unit \ IO = {
+    def loop() = menuLoop(menu);
 
     println(menuString(menu));
 
-    let optItem = getInput() |>
-        Option.flatMap(matchOnItems(menu));
-    match optItem {
+    match getMenuInput(menu) {
         case None =>
             loop()
         case Some(item) =>
