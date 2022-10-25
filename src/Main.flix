@@ -1,0 +1,1 @@
+def main(): Unit \ IO = println("Tic Tac Toe!")
