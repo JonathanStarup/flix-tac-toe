@@ -1,6 +1,14 @@
 use String.{lineSeparator => newline}
 
-def menuItems(): List[String] = "play" :: "menu" :: "quit" :: Nil
+type alias MenuItem = {name = String}
+
+def menuItem(name: String): MenuItem = {name = name}
+
+def menuItems(): List[MenuItem] =
+    menuItem("play") ::
+    menuItem("menu") ::
+    menuItem("quit") ::
+    Nil
 
 def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
 
@@ -34,6 +42,6 @@ def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
 
-    println(menuString(menuItems()));
+    println(menuString(menuItems() |> List.map(item -> item.name)));
     discard getInput()
 }
