@@ -1,14 +1,28 @@
 use String.{lineSeparator => newline}
 
-type alias MenuItem = {name = String, action = Unit -> Unit \ IO}
+enum Action {
+    case Exit
+    case Action(Unit -> Unit \ IO)
+}
 
-def wip(): Unit \ IO = println("WIP")
+type alias MenuItem = {name = String, action = Action}
+
+def wip(feature: String): Unit -> Unit \ IO =
+    () -> println("${feature} WIP")
 
 def menuItems(): List[MenuItem] =
-    {name = "play", action = wip} ::
-    {name = "menu", action = wip} ::
-    {name = "quit", action = wip} ::
+    {name = "play", action = Action(wip("play"))} ::
+    {name = "menu", action = Action(wip("menu"))} ::
+    {name = "quit", action = Exit} ::
     Nil
+
+def matchMenuItem(s: String, item: MenuItem): Bool = {
+    s == item.name
+}
+
+def matchOnItems(s: String, items: List[MenuItem]): Option[MenuItem] = {
+    List.findLeft(matchMenuItem(s), items)
+}
 
 def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
 
@@ -41,7 +55,26 @@ def getInput(): Option[String] \ IO = {
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
+    mainLoop(menuItems())
+}
 
-    println(menuString(menuItems() |> List.map(item -> item.name)));
-    discard getInput()
+def mainLoop(menuItems: List[MenuItem]): Unit \ IO = {
+    def loop() = mainLoop(menuItems);
+    println(menuString(menuItems |> List.map(item -> item.name)));
+    match getInput() {
+        case None =>
+            loop()
+        case Some(input) =>
+            match matchOnItems(input, menuItems) {
+                case None => loop()
+                case Some(item) =>
+                    match item.action {
+                        case Exit => ()
+                        case Action(action) =>
+                            action();
+                            loop()
+                    }
+            }
+    }
+
 }
