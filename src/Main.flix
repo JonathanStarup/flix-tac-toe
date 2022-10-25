@@ -1,6 +1,6 @@
 use String.{lineSeparator => newline}
 
-def menuItems(): List[String] = "play" :: "menu" :: Nil
+def menuItems(): List[String] = "play" :: "menu" :: "quit" :: Nil
 
 def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
 
