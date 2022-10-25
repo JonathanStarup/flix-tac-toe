@@ -1,8 +1,13 @@
 use String.{lineSeparator => newline}
 
 enum Action {
-    case Exit
     case Action(Unit -> Unit \ IO)
+    case Exit
+}
+
+def runAction(a: Action, postAction: Unit -> Unit \ ef): Unit \ {IO, ef} = match a {
+    case Action(action) => action(); postAction()
+    case Exit => ()
 }
 
 type alias MenuItem = {name = String, action = Action}
@@ -20,7 +25,7 @@ def matchMenuItem(s: String, item: MenuItem): Bool = {
     s == item.name
 }
 
-def matchOnItems(s: String, items: List[MenuItem]): Option[MenuItem] = {
+def matchOnItems(items: List[MenuItem], s: String): Option[MenuItem] = {
     List.findLeft(matchMenuItem(s), items)
 }
 
@@ -41,8 +46,8 @@ def boxLines(padding: {padding = Int32}, lines: List[String]): List[String] = {
     bar :: (barredLines `List.append` (List.point(bar)))
 }
 
-def menuString(items: List[String]): String = {
-    let menuLine = List.join("  ", items);
+def menuString(menu: List[MenuItem]): String = {
+    let menuLine = List.join("  ", List.map(i -> i.name, menu));
     let boxLines = boxLines(padding = 2, List.point(menuLine));
     newline() + List.join(newline(), boxLines)
 }
@@ -52,29 +57,29 @@ def getInput(): Option[String] \ IO = {
     Console.readLine()
 }
 
+def getMenuInput(menu: List[MenuItem]): Option[MenuItem] \ IO = {
+    getInput() |>
+        Option.flatMap(matchOnItems(menu))
+}
+
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
     mainLoop(menuItems())
 }
 
-def mainLoop(menuItems: List[MenuItem]): Unit \ IO = {
-    def loop() = mainLoop(menuItems);
-    println(menuString(menuItems |> List.map(item -> item.name)));
-    match getInput() {
+def mainLoop(menu: List[MenuItem]): Unit \ IO = {
+    def loop() = mainLoop(menu);
+
+    println(menuString(menu));
+
+    let optItem = getInput() |>
+        Option.flatMap(matchOnItems(menu));
+    match optItem {
         case None =>
             loop()
-        case Some(input) =>
-            match matchOnItems(input, menuItems) {
-                case None => loop()
-                case Some(item) =>
-                    match item.action {
-                        case Exit => ()
-                        case Action(action) =>
-                            action();
-                            loop()
-                    }
-            }
+        case Some(item) =>
+            runAction(item.action, loop)
     }
 
 }
