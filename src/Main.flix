@@ -21,9 +21,15 @@ def menuString(items: List[String]): String = {
     newline() + List.join(newline(), boxLines)
 }
 
+def getInput(): Option[String] \ IO = {
+    print("> ");
+    Console.readLine()
+}
+
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
 
-    println(menuString(menuItems()))
+    println(menuString(menuItems()));
+    discard getInput()
 }
