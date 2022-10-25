@@ -6,18 +6,22 @@ def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
 
 def introduction(): String = "Type out any command in the box"
 
-def boxLines(barWidth: {barWidth = Int32}, padding: {padding = Int32}, lines: List[String]): List[String] = {
+def boxLines(padding: {padding = Int32}, lines: List[String]): List[String] = {
     let pad = String.repeat(padding.padding, " ");
+    // this is an upper bound if colors are present.
+    let maxLine = lines |>
+        List.map(String.length) |>
+        List.maximum |>
+        Option.getWithDefault(0);
+    let barLength = maxLine + 2 * padding.padding + 1;
     let barredLines = lines |> List.map(line -> "|${pad}${line}");
-    let bar = "|${String.repeat(barWidth.barWidth - 1, "-")}";
+    let bar = "|${String.repeat(barLength - 1, "-")}";
     bar :: (barredLines `List.append` (List.point(bar)))
 }
 
 def menuString(items: List[String]): String = {
     let menuLine = List.join("  ", items);
-    let extraWidth = 10;
-    let barWidth = String.length(menuLine) + extraWidth;
-    let boxLines = boxLines(barWidth = barWidth, padding = 2, List.point(menuLine));
+    let boxLines = boxLines(padding = 2, List.point(menuLine));
     newline() + List.join(newline(), boxLines)
 }
 
