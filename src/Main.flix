@@ -16,15 +16,20 @@ def main(): Unit \ IO = {
     Menu.menuLoop(mainMenu())
 }
 
-pub def mainMenu(): Menu.Menu = Menu.addReturnItem("quit",
+def mainMenu(): Menu.Menu = Menu.addReturnItem("quit",
     {name = "play", action = Menu.menuAction(playMenu())} ::
-    {name = "menu", action = Menu.wip("menu")} ::
+    {name = "settings", action = Menu.menuAction(settingsMenu())} ::
     Nil
 )
 
-pub def playMenu(): Menu.Menu = Menu.addReturnItem("back",
+def playMenu(): Menu.Menu = Menu.addReturnItem("back",
     {name = "1 player", action = Menu.wip("1 player")} ::
     {name = "2 player", action = Menu.wip("2 player")} ::
+    Nil
+)
+
+def settingsMenu(): Menu.Menu = Menu.addReturnItem("back",
+    {name = "colors", action = Menu.wip("colors")} ::
     Nil
 )
 
@@ -103,6 +108,5 @@ namespace Menu {
         case Action(action) => action(); postAction()
         case Return => ()
     }
-
 
 }
