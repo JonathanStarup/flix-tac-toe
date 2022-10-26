@@ -13,10 +13,11 @@ def introduction(): String = "Type out any command in the box"
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
-    Menu.menuLoop(mainMenu())
+    let initConfig = ();
+    Menu.menuLoop(mainMenu(), initConfig)
 }
 
-def mainMenu(): Menu.Menu = Menu.addReturnItem("quit",
+def mainMenu(): Menu.Menu[Unit] = Menu.addReturnItem("quit",
     {
         name = "play",
         action = Menu.menuAction(playMenu())
@@ -27,7 +28,7 @@ def mainMenu(): Menu.Menu = Menu.addReturnItem("quit",
     Nil
 )
 
-def playMenu(): Menu.Menu = Menu.addReturnItem("back",
+def playMenu(): Menu.Menu[Unit] = Menu.addReturnItem("back",
     {
         name = "1 player",
         action = Menu.wip("1 player")
@@ -38,7 +39,7 @@ def playMenu(): Menu.Menu = Menu.addReturnItem("back",
     Nil
 )
 
-def settingsMenu(): Menu.Menu = Menu.addReturnItem("back",
+def settingsMenu(): Menu.Menu[Unit] = Menu.addReturnItem("back",
     {
         name = "colors",
         action = Menu.wip("colors")
@@ -48,39 +49,45 @@ def settingsMenu(): Menu.Menu = Menu.addReturnItem("back",
 
 namespace Menu {
 
-    pub type alias Menu = List[MenuItem]
+    pub type alias Menu[config] = List[MenuItem[config]]
 
-    pub type alias MenuItem = {name = String, action = Action}
+    pub type alias MenuItem[config] = {name = String, action = Action[config]}
 
-    pub enum Action {
-        case Action(Unit -> Unit \ IO)
+    pub enum Action[config] {
+        case Action(config -> config \ IO)
         case Return
     }
 
-    pub def addReturnItem(name: String, m: Menu): Menu =
+    pub def addReturnItem(name: String, m: Menu[config]): Menu[config] =
         m `List.append` ({name = name, action = Return} :: Nil)
 
-    pub def wip(feature: String): Action =
-        Action(() -> println("${feature} in development"))
+    pub def wip(feature: String): Action[config] =
+        Action(config -> {
+            println("${feature} in development");
+            config
+        })
 
-    pub def menuAction(menu: Menu): Action = {
-        Action(() -> menuLoop(menu))
+    pub def menuAction(menu: Menu[config]): Action[config] = {
+        Action(config -> menuLoop(menu, config))
     }
 
-    pub def menuLoop(menu: Menu): Unit \ IO = {
-        def loop() = menuLoop(menu);
+    pub def menuLoop(menu: Menu[config], config: config): config \ IO = {
+        let loop = menuLoop(menu);
 
         println(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
             case None =>
-                loop()
-            case Some(item) =>
-                runAction(item.action, loop)
+                loop(config)
+            case Some(item) => match item.action {
+                case Return => config
+                case Action(action) =>
+                    loop(action(config))
+            }
         }
     }
 
-    def getMenuInput(menu: Menu): Option[MenuItem] \ IO = {
+    def getMenuInput(menu: Menu[config]): Option[MenuItem[config]] \ IO = {
         flatMap(matchOnItems(menu), getInput())
     }
 
@@ -89,7 +96,7 @@ namespace Menu {
         Console.readLine()
     }
 
-    def menuString(padding: {padding = Int32}, menu: Menu): String = {
+    def menuString(padding: {padding = Int32}, menu: Menu[config]): String = {
         let pad = String.repeat(padding.padding, " ");
         let menuLine = join(pad, map(i -> i.name, menu));
         let boxLines = boxLines(padding, point(menuLine));
@@ -109,17 +116,12 @@ namespace Menu {
         bar :: (barredLines `List.append` (point(bar)))
     }
 
-    def matchMenuItem(s: String, item: MenuItem): Bool = {
+    def matchMenuItem(s: String, item: MenuItem[config]): Bool = {
         s == item.name
     }
 
-    def matchOnItems(items: Menu, s: String): Option[MenuItem] = {
+    def matchOnItems(items: Menu[config], s: String): Option[MenuItem[config]] = {
         findLeft(matchMenuItem(s), items)
-    }
-
-    def runAction(a: Action, postAction: Unit -> Unit \ ef): Unit \ {IO, ef} = match a {
-        case Action(action) => action(); postAction()
-        case Return => ()
     }
 
 }
