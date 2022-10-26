@@ -17,19 +17,32 @@ def main(): Unit \ IO = {
 }
 
 def mainMenu(): Menu.Menu = Menu.addReturnItem("quit",
-    {name = "play", action = Menu.menuAction(playMenu())} ::
-    {name = "settings", action = Menu.menuAction(settingsMenu())} ::
+    {
+        name = "play",
+        action = Menu.menuAction(playMenu())
+    } :: {
+        name = "settings",
+        action = Menu.menuAction(settingsMenu())
+    } ::
     Nil
 )
 
 def playMenu(): Menu.Menu = Menu.addReturnItem("back",
-    {name = "1 player", action = Menu.wip("1 player")} ::
-    {name = "2 player", action = Menu.wip("2 player")} ::
+    {
+        name = "1 player",
+        action = Menu.wip("1 player")
+    } :: {
+        name = "2 player",
+        action = Menu.wip("2 player")
+    } ::
     Nil
 )
 
 def settingsMenu(): Menu.Menu = Menu.addReturnItem("back",
-    {name = "colors", action = Menu.wip("colors")} ::
+    {
+        name = "colors",
+        action = Menu.wip("colors")
+    } ::
     Nil
 )
 
