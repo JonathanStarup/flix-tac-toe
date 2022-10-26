@@ -58,6 +58,10 @@ namespace Menu {
         case Return
     }
 
+    pub def pureAction(f: config -> config): Action[config] = {
+        Action(upcast(f))
+    }
+
     pub def addReturnItem(name: String, m: Menu[config]): Menu[config] =
         m `List.append` ({name = name, action = Return} :: Nil)
 
