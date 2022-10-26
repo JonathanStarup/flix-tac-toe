@@ -1,5 +1,6 @@
 use Applicative.point
 use Foldable.findLeft
+use Foldable.foreach
 use Foldable.join
 use Functor.map
 use Monad.flatMap
@@ -13,11 +14,11 @@ def introduction(): String = "Type out any command in the box"
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
-    let initConfig = ();
-    Menu.menuLoop(mainMenu(), initConfig)
+    let initConfig = {colors = false};
+    discard Menu.menuLoop(None, initConfig, mainMenu())
 }
 
-def mainMenu(): Menu.Menu[Unit] = Menu.menu("exit",
+def mainMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("exit",
     {
         name = "play",
         action = Menu.menuAction(playMenu())
@@ -28,7 +29,7 @@ def mainMenu(): Menu.Menu[Unit] = Menu.menu("exit",
     Nil
 )
 
-def playMenu(): Menu.Menu[Unit] = Menu.menu("back",
+def playMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "1 player",
         action = Menu.wip("1 player")
@@ -39,17 +40,27 @@ def playMenu(): Menu.Menu[Unit] = Menu.menu("back",
     Nil
 )
 
-def settingsMenu(): Menu.Menu[Unit] = Menu.menu("back",
+def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "colors",
-        action = Menu.wip("colors")
+        action = config -> {
+            Menu.menuLoop(Some("colors = ${config.colors}"), config, Menu.menu("cancel",
+                {
+                    name = "true",
+                    action = Menu.pureAction(c -> {colors = true | c})
+                } :: {
+                    name = "false",
+                    action = Menu.pureAction(c -> {colors = false | c})
+                } ::
+                Nil
+            ))
+        }
     } ::
     Nil
 )
 
 namespace Menu {
 
-    // TODO: add a return item structurally
     ///
     /// A list of items that modify a `config` value.
     ///
@@ -65,6 +76,7 @@ namespace Menu {
     ///
     pub type alias MenuItem[config] = {name = String, action = Action[config]}
 
+    // TODO: add terminal actions
     ///
     /// An action on a `config` value.
     ///
@@ -81,14 +93,20 @@ namespace Menu {
             config
         }
 
-    /// `config -> menuLoop(menu, config)`
+    /// `config -> menuLoop(None, config, menu)`
     pub def menuAction(menu: Menu[config]): Action[config] = {
-        config -> menuLoop(menu, config)
+        config -> menuLoop(None, config, menu)
     }
 
-    pub def menuLoop(menu: Menu[config], config: config): config \ IO = {
-        let loop = menuLoop(menu);
+    /// `config -> menuLoop(Some(msg), config, menu)`
+    pub def menuActionMsg(msg: String, menu: Menu[config]): Action[config] = {
+        config -> menuLoop(Some(msg), config, menu)
+    }
 
+    pub def menuLoop(msg: Option[String], config: config, menu: Menu[config]): config \ IO = {
+        def loop(c) = menuLoop(msg, c, menu);
+
+        msg |> foreach(s -> println("|${String.repeat(3, " ")}${s}"));
         println(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
@@ -113,7 +131,7 @@ namespace Menu {
         let names = map(i -> i.name, items) `List.append` (return :: Nil);
         let menuLine = join(pad, names);
         let boxLines = boxLines(padding, point(menuLine));
-        newline() + join(newline(), boxLines)
+        join(newline(), boxLines)
     }
 
     def boxLines(padding: {padding = Int32}, lines: List[String]): List[String] = {
