@@ -17,7 +17,7 @@ def main(): Unit \ IO = {
     Menu.menuLoop(mainMenu(), initConfig)
 }
 
-def mainMenu(): Menu.Menu[Unit] = Menu.addReturnItem("quit",
+def mainMenu(): Menu.Menu[Unit] =
     {
         name = "play",
         action = Menu.menuAction(playMenu())
@@ -25,10 +25,11 @@ def mainMenu(): Menu.Menu[Unit] = Menu.addReturnItem("quit",
         name = "settings",
         action = Menu.menuAction(settingsMenu())
     } ::
+        Menu.returnItem("quit")
+    ::
     Nil
-)
 
-def playMenu(): Menu.Menu[Unit] = Menu.addReturnItem("back",
+def playMenu(): Menu.Menu[Unit] =
     {
         name = "1 player",
         action = Menu.wip("1 player")
@@ -36,34 +37,50 @@ def playMenu(): Menu.Menu[Unit] = Menu.addReturnItem("back",
         name = "2 player",
         action = Menu.wip("2 player")
     } ::
+        Menu.returnItem("back")
+    ::
     Nil
-)
 
-def settingsMenu(): Menu.Menu[Unit] = Menu.addReturnItem("back",
+def settingsMenu(): Menu.Menu[Unit] =
     {
         name = "colors",
         action = Menu.wip("colors")
     } ::
+        Menu.returnItem("back")
+    ::
     Nil
-)
 
 namespace Menu {
 
+    // TODO: add a return item structurally
+    ///
+    /// A list of items that modify a `config` value.
+    ///
     pub type alias Menu[config] = List[MenuItem[config]]
 
+    ///
+    /// An named item that can modify a `config` value.
+    /// An item is invoked by its name verbatim.
+    ///
     pub type alias MenuItem[config] = {name = String, action = Action[config]}
 
+    ///
+    /// An action on a `config` value. A `Return` action means that the
+    /// contextual menu should close.
+    ///
     pub enum Action[config] {
         case Action(config -> config \ IO)
         case Return
     }
 
+    /// `Action(upcast(f))`
     pub def pureAction(f: config -> config): Action[config] = {
         Action(upcast(f))
     }
 
-    pub def addReturnItem(name: String, m: Menu[config]): Menu[config] =
-        m `List.append` ({name = name, action = Return} :: Nil)
+    /// `{name = name, action = Return}`
+    pub def returnItem(name: String): MenuItem[config] =
+        {name = name, action = Return}
 
     pub def wip(feature: String): Action[config] =
         Action(config -> {
