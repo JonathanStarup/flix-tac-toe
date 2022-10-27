@@ -43,18 +43,18 @@ def playMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
 def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "colors",
-        action = config -> {
+        action = Menu.action(config -> {
             Menu.menuLoop(Some("colors = ${config.colors}"), config, Menu.menu("cancel",
                 {
                     name = "true",
-                    action = Menu.pureAction(c -> {colors = true | c})
+                    action = Menu.returnAction(c -> {colors = true | c})
                 } :: {
                     name = "false",
-                    action = Menu.pureAction(c -> {colors = false | c})
+                    action = Menu.returnAction(c -> {colors = false | c})
                 } ::
                 Nil
             ))
-        }
+        })
     } ::
     Nil
 )
@@ -76,31 +76,42 @@ namespace Menu {
     ///
     pub type alias MenuItem[config] = {name = String, action = Action[config]}
 
-    // TODO: add terminal actions
     ///
     /// An action on a `config` value.
     ///
-    pub type alias Action[config] = config -> config \ IO
+    pub opaque enum Action[config] {
+        case Action(config -> config \ IO)
+        case ReturnAction(config -> config \ IO)
+    }
 
-    /// `upcast(f)`
-    pub def pureAction(f: config -> config): Action[config] = {
-        upcast(f)
+    /// Some action.
+    pub def action(f: config -> config \ ef): Action[config] = {
+        Action(f as config -> config \ IO)
+    }
+
+    pub def returnAction(f: config -> config \ ef): Action[config] = {
+        ReturnAction(f as config -> config \ IO)
+    }
+
+    /// The action to exit the menu.
+    pub def return(): Action[config] = {
+        ReturnAction(config -> config as \ IO)
     }
 
     /// An action that prints `"${feature} in development"`.
-    pub def wip(feature: String): Action[config] = config -> {
-            println("${feature} in development");
-            config
-        }
+    pub def wip(feature: String): Action[config] = action(config -> {
+        println("${feature} in development");
+        config
+    })
 
-    /// `config -> menuLoop(None, config, menu)`
+    /// `action(config -> menuLoop(None, config, menu))`
     pub def menuAction(menu: Menu[config]): Action[config] = {
-        config -> menuLoop(None, config, menu)
+        action(config -> menuLoop(None, config, menu))
     }
 
-    /// `config -> menuLoop(Some(msg), config, menu)`
+    /// `action(config -> menuLoop(Some(msg), config, menu))`
     pub def menuActionMsg(msg: String, menu: Menu[config]): Action[config] = {
-        config -> menuLoop(Some(msg), config, menu)
+        action(config -> menuLoop(Some(msg), config, menu))
     }
 
     pub def menuLoop(msg: Option[String], config: config, menu: Menu[config]): config \ IO = {
@@ -111,8 +122,12 @@ namespace Menu {
 
         match getMenuInput(menu) {
             case None => loop(config)
-            case Some(Return) => config
-            case Some(Item(item)) => loop((item.action)(config))
+            case Some(Exit) => config
+            case Some(Item(item)) => match item.action {
+                case ReturnAction(action) => action(config)
+                case Action(action) => loop(action(config))
+            }
+
         }
     }
 
@@ -156,7 +171,7 @@ namespace Menu {
     }
 
     enum MatchResult[config] {
-        case Return
+        case Exit
         case Item(MenuItem[config])
     }
 
@@ -164,7 +179,7 @@ namespace Menu {
         let (items, return) = menu;
         // check return before items to avoid being stuck.
         if (matchString(input = s, against = return)) {
-            Some(Return)
+            Some(Exit)
         } else {
             findLeft(matchOnItem(s), items) |> map(Item)
         }
