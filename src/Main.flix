@@ -24,7 +24,7 @@ def mainMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("exit",
         action = Menu.menuAction(playMenu())
     } :: {
         name = "settings",
-        action = Menu.menuAction(settingsMenu())
+        action = Menu.menuActionMsg(settingsString, settingsMenu())
     } ::
     Nil
 )
@@ -40,11 +40,20 @@ def playMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     Nil
 )
 
+def settingsString(config: {colors = Bool | r}): String = {
+    String.unlines(
+        "Current Settings:" ::
+        "  colors = ${config.colors}"
+        :: Nil
+    )
+}
+
 def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "colors",
         action = Menu.action(config -> {
-            Menu.menuLoop(Some(c -> "colors = ${c.colors}"), config, Menu.menu("cancel",
+            let msg = Some(c -> "set colors from ${c.colors} to:");
+            Menu.menuLoop(msg, config, Menu.menu("cancel",
                 {
                     name = "true",
                     action = Menu.returnAction(c -> {colors = true | c})
@@ -84,11 +93,12 @@ namespace Menu {
         case ReturnAction(config -> config \ IO)
     }
 
-    /// Some action.
+    /// An action.
     pub def action(f: config -> config \ ef): Action[config] = {
         Action(f as config -> config \ IO)
     }
 
+    // An action, exiting the menu.
     pub def returnAction(f: config -> config \ ef): Action[config] = {
         ReturnAction(f as config -> config \ IO)
     }
@@ -117,7 +127,12 @@ namespace Menu {
     pub def menuLoop(msg: Option[config -> String \ ef], config: config, menu: Menu[config]): config \ IO = {
         def loop(c) = menuLoop(msg, c, menu);
 
-        msg |> foreach(s -> println("|${String.repeat(3, " ")}${s(config) as \ IO}"));
+        msg |> foreach(s -> {
+            let pad = String.repeat(3, " ");
+            let msg1 = s(config) as \ IO;
+            let content = msg1 |> String.replace(from = "\n", to = "\n|${pad}");
+            println("|${pad}${content}")
+        });
         println(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
@@ -127,7 +142,6 @@ namespace Menu {
                 case ReturnAction(action) => action(config)
                 case Action(action) => loop(action(config))
             }
-
         }
     }
 
