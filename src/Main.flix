@@ -44,7 +44,7 @@ def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "colors",
         action = Menu.action(config -> {
-            Menu.menuLoop(Some("colors = ${config.colors}"), config, Menu.menu("cancel",
+            Menu.menuLoop(Some(c -> "colors = ${c.colors}"), config, Menu.menu("cancel",
                 {
                     name = "true",
                     action = Menu.returnAction(c -> {colors = true | c})
@@ -110,14 +110,14 @@ namespace Menu {
     }
 
     /// `action(config -> menuLoop(Some(msg), config, menu))`
-    pub def menuActionMsg(msg: String, menu: Menu[config]): Action[config] = {
-        action(config -> menuLoop(Some(msg), config, menu))
+    pub def menuActionMsg(msg: config -> String \ ef, menu: Menu[config]): Action[config] = {
+        action(config -> menuLoop(Some(msg as config -> String \ ef), config, menu))
     }
 
-    pub def menuLoop(msg: Option[String], config: config, menu: Menu[config]): config \ IO = {
+    pub def menuLoop(msg: Option[config -> String \ ef], config: config, menu: Menu[config]): config \ IO = {
         def loop(c) = menuLoop(msg, c, menu);
 
-        msg |> foreach(s -> println("|${String.repeat(3, " ")}${s}"));
+        msg |> foreach(s -> println("|${String.repeat(3, " ")}${s(config) as \ IO}"));
         println(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
