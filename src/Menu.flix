@@ -114,12 +114,9 @@ namespace Menu {
         bar :: (barredLines `List.append` (point(bar)))
     }
 
+    /// Return `true` if `input` is a prefix of `against`.
     def matchString(input: {input = String}, against: {against = String}): Bool = {
-        input.input == against.against
-    }
-
-    def matchOnItem(s: String, item: MenuItem[config]): Bool = {
-        matchString(input = s, against = item.name)
+        String.isMatch(regex = "${input.input}.*", against.against)
     }
 
     enum MatchResult[config] {
@@ -130,10 +127,12 @@ namespace Menu {
     def matchOnMenu(menu: Menu[config], s: String): Option[MatchResult[config]] = {
         let (items, return) = menu;
         // check return before items to avoid being stuck.
-        if (matchString(input = s, against = return)) {
-            Some(Exit)
-        } else {
-            findLeft(matchOnItem(s), items) |> map(Item)
+        let menuItems = items |> List.map(i -> (i.name, Item(i)));
+        let withReturn = menuItems `List.append` ((return, Exit) :: Nil);
+        let matches = withReturn |> List.filter(match (is, _) -> matchString(input = s, against = is));
+        match matches {
+            case (_, res) :: Nil => Some(res)
+            case _ => None
         }
     }
 

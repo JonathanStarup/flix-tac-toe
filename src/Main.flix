@@ -18,6 +18,9 @@ def mainMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("exit",
     } :: {
         name = "settings",
         action = Menu.menuActionMsg(settingsString, settingsMenu())
+    } :: {
+        name = "external settings",
+        action = Menu.wip("external settings")
     } ::
     Nil
 )
