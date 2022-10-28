@@ -58,17 +58,25 @@ namespace Menu {
     }
 
     /// `action(config -> menuLoop(Some(msg), config, menu))`
-    pub def menuActionMsg(msg: config -> String \ ef, menu: Menu[config]): Action[config] = {
-        action(config -> menuLoop(Some(msg as config -> String \ ef), config, menu))
+    pub def menuActionMsg(
+        msg: config -> String \ ef,
+        menu: Menu[config]
+    ): Action[config] = {
+        action(config -> {
+            menuLoop(Some(msg as config -> String \ ef), config, menu)
+        })
     }
 
-    pub def menuLoop(msg: Option[config -> String \ ef], config: config, menu: Menu[config]): config \ IO = {
+    pub def menuLoop(
+        msg: Option[config -> String \ ef],
+        config: config, menu: Menu[config]
+    ): config \ IO = {
         def loop(c) = menuLoop(msg, c, menu);
-
+        let pad = String.repeat(3, " ");
+        let addPadding = String.replace(from = "\n", to = "\n|${pad}");
         msg |> foreach(s -> {
-            let pad = String.repeat(3, " ");
             let msg1 = s(config) as \ IO;
-            let content = msg1 |> String.replace(from = "\n", to = "\n|${pad}");
+            let content = msg1 |> addPadding;
             println("|${pad}${content}")
         });
         println(menuString(padding = 3, menu));
@@ -95,13 +103,17 @@ namespace Menu {
     def menuString(padding: {padding = Int32}, menu: Menu[config]): String = {
         let (items, return) = menu;
         let pad = String.repeat(padding.padding, " ");
-        let names = map(i -> i.name, items) `List.append` (return :: Nil);
+        let itemNames = map(i -> i.name, items);
+        let names = itemNames `List.append` (return :: Nil);
         let menuLine = join(pad, names);
         let boxLines = boxLines(padding, point(menuLine));
         join(newline(), boxLines)
     }
 
-    def boxLines(padding: {padding = Int32}, lines: List[String]): List[String] = {
+    def boxLines(
+        padding: {padding = Int32},
+        lines: List[String]
+    ): List[String] = {
         let pad = String.repeat(padding.padding, " ");
         // this is an upper bound if colors are present.
         let maxLine = lines |>
@@ -115,7 +127,10 @@ namespace Menu {
     }
 
     /// Return `true` if `input` is a prefix of `against`.
-    def matchString(input: {input = String}, against: {against = String}): Bool = {
+    def matchString(
+        input: {input = String},
+        against: {against = String}
+    ): Bool = {
         String.isMatch(regex = "${input.input}.*", against.against)
     }
 
@@ -124,12 +139,16 @@ namespace Menu {
         case Item(MenuItem[config])
     }
 
-    def matchOnMenu(menu: Menu[config], s: String): Option[MatchResult[config]] = {
+    def matchOnMenu(
+        menu: Menu[config],
+        s: String
+    ): Option[MatchResult[config]] = {
         let (items, return) = menu;
         // check return before items to avoid being stuck.
-        let menuItems = items |> List.map(i -> (i.name, Item(i)));
+        let menuItems = items |> map(i -> (i.name, Item(i)));
         let withReturn = menuItems `List.append` ((return, Exit) :: Nil);
-        let matches = withReturn |> List.filter(match (is, _) -> matchString(input = s, against = is));
+        let matches = withReturn |>
+            List.filter(match (is, _) -> matchString(input = s, against = is));
         match matches {
             case (_, res) :: Nil => Some(res)
             case _ => None
