@@ -48,18 +48,21 @@ def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
         name = "colors",
         action = Menu.menuActionMsg(
             c -> "set colors from ${c.colors} to:",
-            colorMenu())
-    } ::
-    Nil
-)
-
-def colorMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("cancel",
-    {
-        name = "true",
-        action = Menu.returnAction(c -> {colors = true | c})
-    } :: {
-        name = "false",
-        action = Menu.returnAction(c -> {colors = false | c})
+            Menu.menu("cancel",
+                {
+                    name = "true",
+                    action = Menu.returnAction(
+                        c -> {colors = true | c}
+                    )
+                } :: {
+                    name = "false",
+                    action = Menu.returnAction(
+                        c -> {colors = false | c}
+                    )
+                } ::
+                Nil
+            )
+        )
     } ::
     Nil
 )
