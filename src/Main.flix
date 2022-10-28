@@ -1,8 +1,10 @@
 use String.{lineSeparator => newline}
 
-def titleCard(): String = "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
+def titleCard(): String =
+    "${newline()}      ~ Tic ~ Tac ~ Toe ~${newline()}"
 
-def introduction(): String = "Type out any command in the box"
+def introduction(): String =
+    "Type out any command in the box"
 
 def main(): Unit \ IO = {
     println(titleCard());
@@ -47,19 +49,20 @@ def settingsString(config: {colors = Bool | r}): String = {
 def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     {
         name = "colors",
-        action = Menu.action(config -> {
-            let msg = Some(c -> "set colors from ${c.colors} to:");
-            Menu.menuLoop(msg, config, Menu.menu("cancel",
-                {
-                    name = "true",
-                    action = Menu.returnAction(c -> {colors = true | c})
-                } :: {
-                    name = "false",
-                    action = Menu.returnAction(c -> {colors = false | c})
-                } ::
-                Nil
-            ))
-        })
+        action = Menu.menuActionMsg(
+            c -> "set colors from ${c.colors} to:",
+            colorMenu())
+    } ::
+    Nil
+)
+
+def colorMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("cancel",
+    {
+        name = "true",
+        action = Menu.returnAction(c -> {colors = true | c})
+    } :: {
+        name = "false",
+        action = Menu.returnAction(c -> {colors = false | c})
     } ::
     Nil
 )
