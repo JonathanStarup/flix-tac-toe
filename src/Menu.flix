@@ -134,6 +134,29 @@ namespace Menu {
         String.isMatch(regex = "${input.input}.*", against.against)
     }
 
+    /// Starts from 1 char and gets longer and longer.
+    def prefixes(r: Region[r], s: String): Iterator[String, r] \ r = region r1 {
+        let sb = new StringBuilder(r1);
+        let pfs = new MutList(r1);
+        foreach(c <- String.iterator(r, s)) {
+            StringBuilder.append!(c, sb);
+            MutList.push!(StringBuilder.toString(sb), pfs)
+        };
+        MutList.iterator((pfs as MutList[String, r]))
+    }
+
+    /// `against` has `s` removed.
+    def _minUniquePrefix(
+        s: String,
+        against: List[String]
+    ): Option[String] = region r {
+        prefixes(r, s) |>
+            Iterator.filterL(prefix -> {
+                ???
+            }) |>
+            Iterator.next
+    }
+
     enum MatchResult[config] {
         case Exit
         case Item(MenuItem[config])
