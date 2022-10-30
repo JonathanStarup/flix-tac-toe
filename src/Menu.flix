@@ -48,7 +48,7 @@ namespace Menu {
 
     /// An action that prints `"${feature} in development"`.
     pub def wip(feature: String): Action[config] = action(config -> {
-        println("${feature} in development");
+        outputLine("${feature} in development");
         config
     })
 
@@ -77,9 +77,9 @@ namespace Menu {
         msg |> foreach(s -> {
             let msg1 = s(config) as \ IO;
             let content = msg1 |> addPadding;
-            println("|${pad}${content}")
+            outputLine("|${pad}${content}")
         });
-        println(menuString(padding = 3, menu));
+        outputLine(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
             case None => loop(config)
@@ -91,12 +91,22 @@ namespace Menu {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Private Defs
+    // -------------------------------------------------------------------------
+
+    def output(x: a): Unit \ IO with ToString[a] =
+        print(x)
+
+    def outputLine(x: a): Unit \ IO with ToString[a] =
+        println(x)
+
     def getMenuInput(menu: Menu[config]): Option[MatchResult[config]] \ IO = {
         flatMap(matchOnMenu(menu), getInput())
     }
 
     def getInput(): Option[String] \ IO = {
-        print("> ");
+        output("> ");
         Console.readLine()
     }
 
