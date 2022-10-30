@@ -27,51 +27,65 @@ namespace Menu {
     /// An action on a `config` value.
     ///
     pub opaque enum Action[config] {
-        case Action(config -> config \ IO)
-        case ReturnAction(config -> config \ IO)
+        // The boolean value indicates console effects
+        case Action(config -> config \ IO, Bool)
+        case ReturnAction(config -> config \ IO, Bool)
     }
 
     /// An action.
     pub def action(f: config -> config \ ef): Action[config] = {
-        Action(f as config -> config \ IO)
+        Action(f as config -> config \ IO, false)
+    }
+
+    /// An action with console printing.
+    pub def consoleAction(f: config -> config \ ef): Action[config] = {
+        Action(f as config -> config \ IO, true)
     }
 
     // An action, exiting the menu.
     pub def returnAction(f: config -> config \ ef): Action[config] = {
-        ReturnAction(f as config -> config \ IO)
+        ReturnAction(f as config -> config \ IO, false)
     }
 
-    /// The action to exit the menu.
-    pub def return(): Action[config] = {
-        ReturnAction(config -> config as \ IO)
+    // An action, exiting the menu, with console printing.
+    pub def consoleReturnAction(f: config -> config \ ef): Action[config] = {
+        ReturnAction(f as config -> config \ IO, true)
     }
 
     /// An action that prints `"${feature} in development"`.
-    pub def wip(feature: String): Action[config] = action(config -> {
+    pub def wip(feature: String): Action[config] = consoleAction(config -> {
         outputLine("${feature} in development");
         config
     })
 
-    /// `action(config -> menuLoop(None, config, menu))`
-    pub def menuAction(menu: Menu[config]): Action[config] = {
-        action(config -> menuLoop(None, config, menu))
+    /// `action(config -> menuLoop(None, config, menu, _ -> ansi))`
+    pub def menuAction(menu: Menu[config], ansi: Bool): Action[config] = {
+        consoleAction(config -> menuLoop(None, config, menu, _ -> ansi))
     }
 
-    /// `action(config -> menuLoop(Some(msg), config, menu))`
+    /// `action(config -> menuLoop(Some(msg), config, menu, _ -> ansi))`
     pub def menuActionMsg(
         msg: config -> String \ ef,
-        menu: Menu[config]
+        menu: Menu[config],
+        ansi: Bool
     ): Action[config] = {
-        action(config -> {
-            menuLoop(Some(msg as config -> String \ ef), config, menu)
+        consoleAction(config -> {
+            menuLoop(Some(msg as config -> String \ ef), config, menu, _ -> ansi)
         })
     }
 
     pub def menuLoop(
-        msg: Option[config -> String \ ef],
-        config: config, menu: Menu[config]
+        msg: Option[config -> String \ ef1],
+        config: config,
+        menu: Menu[config],
+        ansi: config -> Bool \ ef2
     ): config \ IO = {
-        def loop(c) = menuLoop(msg, c, menu);
+        def loop(c) = {
+            menuLoop(msg, c, menu, ansi)
+        };
+        def reset(c) = {
+            if (ansi(c) as \ IO) resetDisplay() else ()
+        };
         let pad = String.repeat(3, " ");
         let addPadding = String.replace(from = "\n", to = "\n|${pad}");
         msg |> foreach(s -> {
@@ -82,11 +96,23 @@ namespace Menu {
         outputLine(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
-            case None => loop(config)
-            case Some(Exit) => config
+            case None =>
+                reset(config);
+                loop(config)
+            case Some(Exit) =>
+                reset(config);
+                config
             case Some(Item(item)) => match item.action {
-                case ReturnAction(action) => action(config)
-                case Action(action) => loop(action(config))
+                case ReturnAction(action, console) =>
+                    if (console) reset(config) else ();
+                    let config1 = action(config);
+                    if (not console) reset(config1) else ();
+                    config1
+                case Action(action, console) =>
+                    if (console) reset(config) else ();
+                    let config1 = action(config);
+                    if (not console) reset(config1) else ();
+                    loop(config1)
             }
         }
     }
@@ -100,6 +126,9 @@ namespace Menu {
 
     def outputLine(x: a): Unit \ IO with ToString[a] =
         println(x)
+
+    def resetDisplay(): Unit \ IO =
+        Terminal.clearScreenAndReset()
 
     def getMenuInput(menu: Menu[config]): Option[MatchResult[config]] \ IO = {
         flatMap(matchOnMenu(menu), getInput())
@@ -177,7 +206,6 @@ namespace Menu {
         s: String
     ): Option[MatchResult[config]] = {
         let (items, return) = menu;
-        // check return before items to avoid being stuck.
         let menuItems = items |> map(i -> (i.name, Item(i)));
         let withReturn = menuItems `List.append` ((return, Exit) :: Nil);
         let matches = withReturn |>

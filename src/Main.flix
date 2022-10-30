@@ -9,22 +9,41 @@ def introduction(): String =
 def main(): Unit \ IO = {
     println(titleCard());
     println(introduction());
-    let initConfig = {colors = false};
-    discard Menu.menuLoop(None, initConfig, mainMenu())
+    let initConfig = {ansi = false};
+    discard Menu.menuLoop(
+        None,
+        initConfig,
+        mainMenu(),
+        c1 -> c1.ansi
+    )
 }
 
-def mainMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("exit",
+def mainMenu(): Menu.Menu[{ansi = Bool | r}] = Menu.menu("exit",
     {
         name = "play",
-        action = Menu.menuAction(playMenu())
+        action = Menu.consoleAction(c ->
+            Menu.menuLoop(
+                None,
+                c,
+                playMenu(),
+                c1 -> c1.ansi
+            )
+        )
     } :: {
         name = "settings",
-        action = Menu.menuActionMsg(settingsString, settingsMenu())
+        action = Menu.consoleAction(c ->
+            Menu.menuLoop(
+                Some(settingsString),
+                c,
+                settingsMenu(),
+                c1 -> c1.ansi
+            )
+        )
     } ::
     Nil
 )
 
-def playMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
+def playMenu(): Menu.Menu[{ansi = Bool | r}] = Menu.menu("back",
     {
         name = "1 player",
         action = Menu.wip("1 player")
@@ -35,33 +54,37 @@ def playMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
     Nil
 )
 
-def settingsString(config: {colors = Bool | r}): String = {
+def settingsString(config: {ansi = Bool | r}): String = {
     String.unlines(
         "Current Settings:" ::
-        "  colors = ${config.colors}"
+        "  ansi = ${config.ansi}"
         :: Nil
     )
 }
 
-def settingsMenu(): Menu.Menu[{colors = Bool | r}] = Menu.menu("back",
+def settingsMenu(): Menu.Menu[{ansi = Bool | r}] = Menu.menu("back",
     {
-        name = "colors",
-        action = Menu.menuActionMsg(
-            c -> "set colors from ${c.colors} to:",
-            Menu.menu("cancel",
-                {
-                    name = "true",
-                    action = Menu.returnAction(
-                        c -> {colors = true | c}
-                    )
-                } :: {
-                    name = "false",
-                    action = Menu.returnAction(
-                        c -> {colors = false | c}
-                    )
-                } ::
-                Nil
-            )
+        name = "ansi",
+        action = Menu.consoleAction(c -> Menu.menuLoop(
+            Some(c1 -> "set ansi from ${c1.ansi} to:"),
+            c,
+            ansiSettingMenu(),
+            c1 -> c1.ansi
+        ))
+    } ::
+    Nil
+)
+
+def ansiSettingMenu(): Menu.Menu[{ansi = Bool | r}] = Menu.menu("cancel",
+    {
+        name = "true",
+        action = Menu.returnAction(
+            c1 -> {ansi = true | c1}
+        )
+    } :: {
+        name = "false",
+        action = Menu.returnAction(
+            c1 -> {ansi = false | c1}
         )
     } ::
     Nil
