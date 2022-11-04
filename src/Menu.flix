@@ -54,67 +54,81 @@ namespace Menu {
 
     /// An action that prints `"${feature} in development"`.
     pub def wip(feature: String): Action[config] = consoleAction(config -> {
-        outputLine("${feature} in development");
+        outputMessage("${feature} in development");
         config
     })
 
-    /// `action(config -> menuLoop(None, config, menu, _ -> ansi))`
-    pub def menuAction(menu: Menu[config], ansi: Bool): Action[config] = {
-        consoleAction(config -> menuLoop(None, config, menu, _ -> ansi))
-    }
-
-    /// `action(config -> menuLoop(Some(msg), config, menu, _ -> ansi))`
-    pub def menuActionMsg(
-        msg: config -> String \ ef,
-        menu: Menu[config],
-        ansi: Bool
-    ): Action[config] = {
-        consoleAction(config -> {
-            menuLoop(Some(msg as config -> String \ ef), config, menu, _ -> ansi)
-        })
+    pub def menuAction(menu: Menu[config]): Action[config] = {
+        consoleAction(config -> menuLoop(config, menu))
     }
 
     pub def menuLoop(
-        msg: Option[config -> String \ ef1],
         config: config,
-        menu: Menu[config],
-        ansi: config -> Bool \ ef2
+        menu: Menu[config]
     ): config \ IO = {
         def loop(c) = {
-            menuLoop(msg, c, menu, ansi)
+            menuLoop(c, menu)
         };
-        def reset(c) = {
-            if (ansi(c) as \ IO) resetDisplay() else ()
+        Terminal.saveCursor();
+        def reset() = {
+            Terminal.restoreCursor();
+            Terminal.clearScreenAfterCursor()
         };
-        let pad = String.repeat(3, " ");
-        let addPadding = String.replace(from = "\n", to = "\n|${pad}");
-        msg |> foreach(s -> {
-            let msg1 = s(config) as \ IO;
-            let content = msg1 |> addPadding;
-            outputLine("|${pad}${content}")
-        });
         outputLine(menuString(padding = 3, menu));
 
         match getMenuInput(menu) {
             case None =>
-                reset(config);
+                reset();
                 loop(config)
             case Some(Exit) =>
-                reset(config);
+                reset();
                 config
             case Some(Item(item)) => match item.action {
                 case ReturnAction(action, console) =>
-                    if (console) reset(config) else ();
+                    if (console) reset() else ();
                     let config1 = action(config);
-                    if (not console) reset(config1) else ();
+                    if (not console) reset() else ();
                     config1
                 case Action(action, console) =>
-                    if (console) reset(config) else ();
+                    if (console) reset() else ();
                     let config1 = action(config);
-                    if (not console) reset(config1) else ();
+                    if (not console) reset() else ();
                     loop(config1)
             }
         }
+    }
+
+    pub def outputMessage(msg: String): Unit \ IO = {
+        Terminal.clearScreenAndReset();
+        outputLine(msg)
+    }
+
+    /// Assumes the cursor is on a new line
+    pub def prompt(parser: String -> Option[a], cancel: String): Option[a] \ IO = {
+        def header() = {
+            outputLine("------------");
+            outputLine("")
+        };
+        Terminal.saveCursor();
+        header();
+        def inner() = match getInput() {
+            case None => inner()
+            case Some(line) if line == cancel =>
+                None
+            case Some(line) =>
+                match parser(String.trim(line)) {
+                    case Some(output) =>
+                        Terminal.restoreCursor();
+                        Terminal.clearScreenAfterCursor();
+                        Some(output)
+                    case None =>
+                        Terminal.restoreCursor();
+                        Terminal.clearScreenAfterCursor();
+                        header();
+                        inner()
+                }
+        };
+        inner()
     }
 
     // -------------------------------------------------------------------------
@@ -126,9 +140,6 @@ namespace Menu {
 
     def outputLine(x: a): Unit \ IO with ToString[a] =
         println(x)
-
-    def resetDisplay(): Unit \ IO =
-        Terminal.clearScreenAndReset()
 
     def getMenuInput(menu: Menu[config]): Option[MatchResult[config]] \ IO = {
         flatMap(matchOnMenu(menu), getInput())
