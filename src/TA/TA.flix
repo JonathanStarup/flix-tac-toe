@@ -5,23 +5,57 @@ def play(): Unit \ IO = {
         case Ok(None) =>
             println("exited")
         case Ok(Some(c)) =>
+            let data = {player = c};
+            story(data);
             println("character:");
             println("  name: ${c.name}");
             println("  profession: ${c.prof}")
     }
 }
+
+def consoleWidth(): Int32 = 50
+
+type alias Data = {
+    player = {
+        name = String,
+        prof = Profession
+    }
+}
+
+namespace Constants {
+    pub def city(): String = "Nuet Benig"
+}
+
+def story(data: Data): Unit \ IO = {
+    enterToContinue(
+        List.join(" ",
+            "You are the ${emph(data.player.prof)} named" ::
+            "${emph(data.player.name)} in the place" ::
+            "${emph(Constants.city())}." :: Nil
+        ) ::
+        Nil
+    );
+    enterToContinue(
+        "Another being walks up to you." ::
+        quotes("Are you okay? You look kind of messed up.") ::
+        Nil
+    )
+}
+
 enum Profession with Eq, ToString {
-    case Smith
-    case Student
+    case Constructor
+    case Learner
+    case PeoplePerson
 }
 
 def professions(): Nel[Profession] = {
-    Nel.Nel(Smith, Student :: Nil)
+    Nel.Nel(Constructor, Learner :: PeoplePerson :: Nil)
 }
 
 def characterSetup(): Result[Option[{name = String, prof = Profession}], String] \ IO = {
     let nameRes = taPrompt(
-        "Whats your name?",
+        "Whats your name?" ::
+        Nil,
         s -> match s {
             case _ if String.length(s) < 3 =>
                 Err("Name must be at least three characters.")
@@ -29,17 +63,22 @@ def characterSetup(): Result[Option[{name = String, prof = Profession}], String]
                 Err("Name must not be longer than ten characters.")
             case _ if not String.isMatch(regex = "[A-Za-z]+", s) =>
                 Err("Name can only be one word with letters.")
-            case _ => Ok(String.toLowerCase(s))
+            case _ if not String.isMatch(regex = "[A-Z][a-z]+", s) =>
+                Err("Name must be properly capitalized")
+            case _ => Ok(s)
         },
         "A one word name using letters"
     ) |> map(n  -> {name = n});
     nameRes |> flatMap(data -> taSelection(
-        "What's your profession?",
+        "${data.name}... Nice name." ::
+        " What's your profession?" ::
+        Nil,
         Nel.map(ToString.toString, professions()) |> Nel.toList,
         "Type out one of the professions"
     ) |> map(profS -> match profS {
-        case "Smith" => {+prof = Smith | data}
-        case "Student" => {+prof = Student | data}
+        case "Constructor" => {+prof = Constructor | data}
+        case "Learner" => {+prof = Learner | data}
+        case "PeoplePerson" => {+prof = PeoplePerson | data}
         case _ => ?unreachable
     }))
 }
@@ -66,12 +105,24 @@ def map(
     }
 }
 
+def enterToContinue(text: List[String]): Unit \ IO = {
+    discard prompt(
+        text,
+        consoleWidth(),
+        _ -> Ok(()),
+        "",
+        Set.empty(),
+        Set.empty()
+    )
+}
+
 def taPrompt(
-    text: String,
+    text: List[String],
     parser: String -> Result[a, String],
     helpMsg: String
 ): Result[Option[a], String] \ IO = prompt(
     text,
+    consoleWidth(),
     parser,
     helpMsg,
     Set#{"help"},
@@ -79,13 +130,13 @@ def taPrompt(
 )
 
 def taSelection(
-    text: String,
+    text: List[String],
     items: List[String],
     helpMsg: String
 ): Result[Option[String], String] \ IO = selection(
     text,
     items,
-    40,
+    consoleWidth(),
     helpMsg,
     Set#{"help"},
     Set#{"cancel"}
@@ -102,15 +153,17 @@ def getInput(): Result[String, String] \ IO = {
 /// Ok(None) means a cancel cmd.
 /// Errors should not be reattempted.
 pub def prompt(
-    text: String,
+    text: List[String],
+    width: Int32,
     parser: String -> Result[a, String],
     helpMsg: String,
     help: Set[String],
     cancel: Set[String]
 ): Result[Option[a], String] \ IO = {
+    let w0 = Int32.max(1, width);
     Terminal.clearScreenAndReset();
-    println(text);
-    println("------------");
+    println(clampParagraphs(text, w0));
+    println(String.repeat(w0, "-"));
     Terminal.saveCursor();
     println("");
     def inner() = match getInput() {
@@ -121,7 +174,7 @@ pub def prompt(
         case Ok(input) if Set.exists(Eq.eq(input), help) =>
             Terminal.restoreCursor();
             Terminal.clearScreenAfterCursor();
-            println(helpMsg);
+            println(clampText(helpMsg, w0));
             inner()
         case Ok(input) =>
             match parser(String.trim(input)) {
@@ -130,7 +183,7 @@ pub def prompt(
                 case Err(msg) =>
                     Terminal.restoreCursor();
                     Terminal.clearScreenAfterCursor();
-                    println(msg);
+                    println(clampText(msg, w0));
                     inner()
             }
     };
@@ -138,52 +191,25 @@ pub def prompt(
 }
 
 def selection(
-    text: String,
+    text: List[String],
     items: List[String],
     width: Int32,
     helpMsg: String,
     help: Set[String],
     cancel: Set[String]
-): Result[Option[String], String] \ IO = region r {
-
-    let maxWord =
-        List.map(String.length, items) |>
-        List.maximum |>
-        Option.getWithDefault(0);
-    let fixedWidth = Int32.max(
-        maxWord+2 /* `+ ` */,
-        width /* `+` */
-    );
-    let line = String.repeat(fixedWidth-1, "-");
+): Result[Option[String], String] \ IO = {
+    let w0 = Int32.max(1, width);
+    let line = String.repeat(w0-1, "-");
     let delim = " | ";
     Terminal.clearScreenAndReset();
-    println(text);
+    println(clampParagraphs(text, w0));
+
+    println("+${line}");
+    let itemLines = clampText(List.join(delim, items), w0-2) |>
+        String.lines;
+    println(itemLines |> List.map(l -> "+ ${l}") |> List.join(String.lineSeparator()));
     println("+${line}");
 
-    let first = ref true @ r;
-    let sb = ref new StringBuilder(r) @ r;
-    StringBuilder.append!("+ ", deref sb);
-    foreach(word <- List.iterator(r, items)) {
-        def tooBig() =
-            StringBuilder.length(deref sb) +
-            String.length(word) +
-            String.length(delim)
-            > fixedWidth;
-        if (deref first) {
-            first := false;
-            StringBuilder.append!(word, deref sb)
-        } else if (tooBig()) {
-            println(StringBuilder.toString(deref sb));
-            sb := new StringBuilder(r);
-            StringBuilder.append!("+ ", deref sb);
-            StringBuilder.append!(word, deref sb)
-        } else {
-            StringBuilder.append!(delim, deref sb);
-            StringBuilder.append!(word, deref sb)
-        }
-    };
-    println(StringBuilder.toString(deref sb));
-    println("+${line}");
     Terminal.saveCursor();
     println("");
     def inner() = match getInput() {
@@ -194,7 +220,7 @@ def selection(
         case Ok(input) if Set.exists(Eq.eq(input), help) =>
             Terminal.restoreCursor();
             Terminal.clearScreenAfterCursor();
-            println(helpMsg);
+            println(clampText(helpMsg, w0));
             inner()
         case Ok(input) =>
             let trimmed = String.trim(input);
@@ -204,9 +230,48 @@ def selection(
                 case None =>
                     Terminal.restoreCursor();
                     Terminal.clearScreenAfterCursor();
-                    println("Type in any item from the list");
+                    println(clampText("Type in any item from the list", w0));
                     inner()
             }
     };
     inner()
 }
+
+def clampParagraphs(ps: List[String], width: Int32): String = {
+    let break = String.repeat(2, String.lineSeparator());
+    ps |> List.map(p -> clampText(p, width)) |> List.join(break)
+}
+
+def clampText(text: String, width: Int32): String = region r {
+    let words = String.words(text);
+
+    let first = ref true @ r;
+    let sb = ref new StringBuilder(r) @ r;
+    let lines = new MutList(r);
+    foreach(word <- List.iterator(r, words)) {
+        def tooBig() =
+            StringBuilder.length(deref sb) +
+            String.length(word) +
+            String.length(" ")
+            > width;
+        if (deref first) {
+            first := false;
+            StringBuilder.append!(word, deref sb)
+        } else if (tooBig()) {
+            MutList.push!(StringBuilder.toString(deref sb), lines);
+            sb := new StringBuilder(r);
+            StringBuilder.append!(word, deref sb)
+        } else {
+            StringBuilder.append!(" ", deref sb);
+            StringBuilder.append!(word, deref sb)
+        }
+    };
+    if (not List.isEmpty(words)) {
+        MutList.push!(StringBuilder.toString(deref sb), lines)
+    } else ();
+    MutList.join(String.lineSeparator(), lines)
+}
+
+def emph(s: a): String with ToString[a] = Console.bold(s)
+
+def quotes(s: a): String with ToString[a] = "\"${s}\""
