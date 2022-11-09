@@ -20,15 +20,13 @@ namespace SmartTerminal {
     ///
     pub def prompt(
         text: String,
-        parser: String -> Output[t] \ ef
+        parser: String -> Output[t] \ ef,
+        initInputHint: String
     ): Result[t, String] \ {IO, ef} = {
-        let barLength = 5;
-        def printBar() = println(String.repeat(barLength, "-"));
-
         /// `extraMsg = ""` does not print an empty line
         def inner(extraMsg: String): Result[t, String] \ {IO, ef} = {
             if (text != "") println(text) else ();
-            printBar();
+            println(line());
             if (extraMsg != "") println(extraMsg) else ();
             print("> ");
             let inputRes = getInput();
@@ -45,7 +43,7 @@ namespace SmartTerminal {
                     }
             }
         };
-        inner("")
+        inner(initInputHint)
     }
 
     /// Unsafely unpacks result types.
@@ -60,12 +58,40 @@ namespace SmartTerminal {
         text: String
     ): Result[Unit, String] \ IO = {
         let newParagraph = String.repeat(2, String.lineSeparator());
-        prompt("${text}${newParagraph}<Press enter to continue>", _ -> Return())
+        prompt(
+            "${text}${newParagraph}<Press enter to continue>",
+            _ -> Return(),
+            ""
+        )
     }
 
-    /// TODO
-    pub def selection(): Unit \ IO =
-        ??? as \ IO
+    /// Uses trim and is case-insensitive
+    pub def selectionPrompt(
+        text: String,
+        items: List[(String, Unit -> Output[t] \ ef)]
+    ): Result[t, String] \ {IO, ef} = {
+        use String.{trim, toLowerCase};
+        let helpMsg = List.join(" | ", List.map(fst, items));
+        let parser = s0 -> {
+            let s1 = trim(toLowerCase(s0));
+            match List.findLeft(match (s, _) -> trim(toLowerCase(s)) == s1, items) {
+                case None => Retry(helpMsg)
+                case Some((_, action)) => match action() {
+                        case Return(v) => Return(v)
+                        case Retry("") => Retry(helpMsg)
+                        case Retry(msg) =>
+                            let break = String.repeat(2, String.lineSeparator());
+                            Retry("${msg}${break}${helpMsg}")
+                    }
+            }
+        };
+        prompt(text, parser, helpMsg)
+    }
+
+    def line(): String = {
+        let barLength = 5;
+        String.repeat(barLength, "-")
+    }
 
     def getInput(): Result[String, String] \ IO = {
         match Console.readLine() {
@@ -80,6 +106,7 @@ namespace SmartTerminal {
         use SmartTerminal.prompt
         use SmartTerminal.crash
         use SmartTerminal.obliviousPrompt
+        use SmartTerminal.selectionPrompt
 
         pub def fileName(): String \ IO = {
             use SmartTerminal.Output.{Return, Retry};
@@ -89,25 +116,25 @@ namespace SmartTerminal {
                     case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
                         Return(s)
                     case _ => Retry("Try something like 'something123.txt'")
-                }
+                },
+                ""
             ))
         }
 
         pub def yesNo(): Unit \ IO = {
             use SmartTerminal.Output.{Return, Retry};
             let coolTimes = 13;
-            crash(prompt(
-                "Do you want to print 'cool'${coolTimes} times? (y/n)",
-                s0 -> match String.trim(s0) {
-                    case "y" =>
-                        List.range(0, coolTimes) |>
-                            List.foreach(_ -> println("cool"));
-                        Return()
-                    case "n" =>
-                        Return()
-                    case _ =>
-                        Retry("")
-                }
+            crash(selectionPrompt(
+                "Do you want to print 'cool'${coolTimes} times?",
+                (
+                    "y",
+                    () -> Return(List.range(0, coolTimes) |>
+                            List.foreach(_ -> println("cool")))
+                ) :: (
+                    "n",
+                    upcast () -> Return()
+                ) ::
+                Nil
             ))
         }
 
@@ -126,7 +153,8 @@ namespace SmartTerminal {
                             "Alright, those are pretty cool. The best candy is blue jeans."
                         ));
                         Return()
-                }
+                },
+                ""
             ));
 
             crash(prompt(
@@ -141,7 +169,22 @@ namespace SmartTerminal {
                     case "" =>
                         Retry("You gotta type something man.")
                     case _ => Retry("Incorrect, stupid!")
-                }
+                },
+                ""
+            ))
+        }
+
+        pub def areYouSure(): Unit \ IO = {
+            use SmartTerminal.Output.{Return, Retry};
+            def areYouSurePrompt(choice) = crash(selectionPrompt(
+                "Are you really sure it's ${choice}?",
+                ("y", () -> Return(Return())) ::
+                ("n", () -> Return(Retry(""))) ::
+                Nil
+            ));
+            crash(selectionPrompt(
+                "What is your favorite programming language?",
+                ("Flix", () -> areYouSurePrompt("Flix")) :: Nil
             ))
         }
 
