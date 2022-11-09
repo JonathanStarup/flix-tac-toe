@@ -145,10 +145,7 @@ namespace TA {
 
     def getInput(): Result[String, String] \ IO = {
         print("> ");
-        match Console.readLine() {
-            case None => Err("Terminal input error, perhaps EOF")
-            case Some(input) => Ok(input)
-        }
+        Console.readLine()
     }
 
     /// Ok(None) means a cancel cmd.

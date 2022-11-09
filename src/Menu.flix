@@ -112,10 +112,11 @@ namespace Menu {
         Terminal.saveCursor();
         header();
         def inner() = match getInput() {
-            case None => inner()
-            case Some(line) if line == cancel =>
+            case Err(_) =>
                 None
-            case Some(line) =>
+            case Ok(line) if line == cancel =>
+                None
+            case Ok(line) =>
                 match parser(String.trim(line)) {
                     case Some(output) =>
                         Terminal.restoreCursor();
@@ -142,10 +143,13 @@ namespace Menu {
         println(x)
 
     def getMenuInput(menu: Menu[config]): Option[MatchResult[config]] \ IO = {
-        flatMap(matchOnMenu(menu), getInput())
+        match getInput() {
+            case Err(_) => None
+            case Ok(input) => matchOnMenu(menu, input)
+        }
     }
 
-    def getInput(): Option[String] \ IO = {
+    def getInput(): Result[String, String] \ IO = {
         output("> ");
         Console.readLine()
     }

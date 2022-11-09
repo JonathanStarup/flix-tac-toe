@@ -21,7 +21,7 @@ namespace SmartTerminal {
     pub def prompt(
         text: String,
         parser: String -> Output[t] \ ef,
-        initInputHint: String
+        startHint: String
     ): Result[t, String] \ {IO, ef} = {
         /// `extraMsg = ""` does not print an empty line
         def inner(extraMsg: String): Result[t, String] \ {IO, ef} = {
@@ -29,7 +29,7 @@ namespace SmartTerminal {
             println(line());
             if (extraMsg != "") println(extraMsg) else ();
             print("> ");
-            let inputRes = getInput();
+            let inputRes = Console.readLine();
             println("");
             match inputRes {
                 case Err(msg) =>
@@ -43,7 +43,7 @@ namespace SmartTerminal {
                     }
             }
         };
-        inner(initInputHint)
+        inner(startHint)
     }
 
     /// Unsafely unpacks result types.
@@ -91,15 +91,6 @@ namespace SmartTerminal {
     def line(): String = {
         let barLength = 5;
         String.repeat(barLength, "-")
-    }
-
-    def getInput(): Result[String, String] \ IO = {
-        match Console.readLine() {
-            case None =>
-                Err("Terminal input error, perhaps EOF or terminated terminal.")
-            case Some(input) =>
-                Ok(input)
-        }
     }
 
     namespace Examples {
