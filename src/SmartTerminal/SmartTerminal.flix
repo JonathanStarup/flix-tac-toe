@@ -20,16 +20,22 @@ namespace SmartTerminal {
     /// given to the `parser`, which will perhaps restart the process with the
     /// additional message of the `Retry` value.
     ///
-    /// `text = ""` does not print an empty line
+    /// In the two following layouts, `startHint` is replaced by the message in
+    /// `Retry` if that is returned by the parser:
     ///
-    /// The look of the console (`startHint` is replaced by the message in
-    /// `Retry` if that is returned by the parser):
-    ///
-    /// `text`
+    /// ---
+    /// The `MultiLine` layout:
+    /// ```
+    /// <text>
     /// -----
-    /// `startHint`
+    /// <startHint>
     /// >
-    ///
+    /// ```
+    /// ---
+    /// The `OneLine` layout:
+    /// ```
+    /// <text> (<StartHint>):
+    /// ```
     ///
     pub def prompt(
         ansi: Bool,
