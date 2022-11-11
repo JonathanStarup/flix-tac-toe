@@ -11,6 +11,10 @@ namespace SmartTerminal {
         case Retry(String)
     }
 
+    pub enum Layout {
+        case OneLine, MultiLine
+    }
+
     ///
     /// Prints the given `text` and then prompts the console for input, which is
     /// given to the `parser`, which will perhaps restart the process with the
@@ -18,8 +22,18 @@ namespace SmartTerminal {
     ///
     /// `text = ""` does not print an empty line
     ///
+    /// The look of the console (`startHint` is replaced by the message in
+    /// `Retry` if that is returned by the parser):
+    ///
+    /// `text`
+    /// -----
+    /// `startHint`
+    /// >
+    ///
+    ///
     pub def prompt(
         ansi: Bool,
+        layout: Layout,
         text: String,
         parser: String -> Output[t] \ ef,
         startHint: String
@@ -27,12 +41,18 @@ namespace SmartTerminal {
         /// `extraMsg = ""` does not print an empty line
         def inner(extraMsg: String): Result[t, String] \ {IO, ef} = {
             if (ansi) Terminal.clearScreenAndReset() else ();
-            if (text != "") println(text) else ();
-            println(line());
-            if (extraMsg != "") println(extraMsg) else ();
-            print("> ");
+            match layout {
+                case OneLine =>
+                    if (text != "") print(text) else ();
+                    if (extraMsg != "") print(" (${extraMsg})") else ();
+                    print(": ")
+                case MultiLine =>
+                    if (text != "") println(text) else ();
+                    println(line());
+                    if (extraMsg != "") println(extraMsg) else ();
+                    print("> ")
+            };
             let inputRes = Console.readLine();
-            println("");
             match inputRes {
                 case Err(msg) =>
                     Err(msg)
@@ -55,23 +75,26 @@ namespace SmartTerminal {
         case Err(msg) => bug!("!!Crash!! ${msg}")
     }
 
-    /// Appends `"<Press enter to continue>"` after the `text`.
-    pub def obliviousPrompt(
+    pub def enterToContinue(
         ansi: Bool,
+        layout: Layout,
         text: String
     ): Result[Unit, String] \ IO = {
-        let newParagraph = String.repeat(2, String.lineSeparator());
         prompt(
             ansi,
-            "${text}${newParagraph}<Press enter to continue>",
+            layout,
+            text,
             _ -> Return(),
-            ""
+            "Press enter to continue"
         )
     }
 
-    /// Uses trim and is case-insensitive
+    /// Uses trim and is case-insensitive.
+    /// If `items` functions return `Retry`, the string is prepended to a
+    /// list of the items
     pub def selectionPrompt(
         ansi: Bool,
+        layout: Layout,
         text: String,
         items: foldable[(String, Unit -> Output[t] \ ef)]
     ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
@@ -82,15 +105,13 @@ namespace SmartTerminal {
             match Foldable.findLeft(match (s, _) -> trim(toLowerCase(s)) == s1, items) {
                 case None => Retry(helpMsg)
                 case Some((_, action)) => match action() {
-                        case Return(v) => Return(v)
-                        case Retry("") => Retry(helpMsg)
-                        case Retry(msg) =>
-                            let break = String.repeat(2, String.lineSeparator());
-                            Retry("${msg}${break}${helpMsg}")
+                        case Return(v)  => Return(v)
+                        case Retry("")  => Retry(helpMsg)
+                        case Retry(msg) => Retry("${msg}${helpMsg}")
                     }
             }
         };
-        prompt(ansi, text, parser, helpMsg)
+        prompt(ansi, layout, text, parser, helpMsg)
     }
 
     def line(): String = {
@@ -101,15 +122,18 @@ namespace SmartTerminal {
     namespace Examples {
         use SmartTerminal.prompt
         use SmartTerminal.crash
-        use SmartTerminal.obliviousPrompt
+        use SmartTerminal.enterToContinue
         use SmartTerminal.selectionPrompt
 
         def ansi(): Bool = true
 
         pub def fileName(): String \ IO = {
             use SmartTerminal.Output.{Return, Retry};
+            use SmartTerminal.Layout.{OneLine, MultiLine};
+
             crash(prompt(
                 ansi(),
+                MultiLine,
                 "Write the file name you'd like to save as (including extension).",
                 s0 -> match String.trim(s0) {
                     case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
@@ -122,9 +146,12 @@ namespace SmartTerminal {
 
         pub def yesNo(): Unit \ IO = {
             use SmartTerminal.Output.{Return, Retry};
+            use SmartTerminal.Layout.{OneLine, MultiLine};
+
             let coolTimes = 13;
             crash(selectionPrompt(
                 ansi(),
+                OneLine,
                 "Do you want to print 'cool'${coolTimes} times?",
                 (
                     "y",
@@ -144,18 +171,23 @@ namespace SmartTerminal {
 
         pub def nestedPrompt(): Unit \ IO = {
             use SmartTerminal.Output.{Return, Retry};
+            use SmartTerminal.Layout.{OneLine, MultiLine};
 
             def helpPrompt() = crash(prompt(
                 ansi(),
+                MultiLine,
                 "Okay, if you really want help I will need at least 20 cool letters",
                 s0 -> match s0 {
+                    case "" =>
+                        Retry("I'm waiting...")
                     case s if not String.isMatch(regex = "[A-Za-z]*", s) =>
                         Retry("I said letters buddy.")
                     case s if not (String.length(s) >= 20) =>
                         Retry("That doesn't look like 20 to me.")
                     case _ =>
-                        crash(obliviousPrompt(
+                        crash(enterToContinue(
                             ansi(),
+                            MultiLine,
                             "Alright, those are pretty cool. The best candy is blue jeans."
                         ));
                         Return()
@@ -165,6 +197,7 @@ namespace SmartTerminal {
 
             crash(prompt(
                 ansi(),
+                MultiLine,
                 "What is the best candy?\n(try 'help' for help)",
                 s0 -> match String.toLowerCase(String.trim(s0)) {
                     case "blue jeans" =>
@@ -184,8 +217,11 @@ namespace SmartTerminal {
 
         pub def areYouSure(): Unit \ IO = {
             use SmartTerminal.Output.{Return, Retry};
+            use SmartTerminal.Layout.{OneLine, MultiLine};
+
             def areYouSurePrompt(choice) = crash(selectionPrompt(
                 ansi(),
+                OneLine,
                 "Are you really sure it's ${choice}?",
                 ("y", () -> Return(Return())) ::
                 ("n", () -> Return(Retry(""))) ::
@@ -194,6 +230,7 @@ namespace SmartTerminal {
             def option(name) = (name, () -> areYouSurePrompt(name));
             crash(selectionPrompt(
                 ansi(),
+                MultiLine,
                 "What is your favorite programming language?",
                 List.map(option, List.sort(
                     "Flix" :: "Scala" :: "Haskell" :: "Java" ::
