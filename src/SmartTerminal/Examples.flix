@@ -1,7 +1,7 @@
 namespace SmartTerminal/Examples {
-    use SmartTerminal.prompt
     use SmartTerminal.crash
     use SmartTerminal.enterToContinue
+    use SmartTerminal.prompt
     use SmartTerminal.selectionPrompt
 
     def ansi(): Bool = true
