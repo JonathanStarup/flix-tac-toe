@@ -1,7 +1,7 @@
 namespace SmartTerminal {
 
     ///
-    /// A smart terminal output.
+    /// Smart terminal parser output.
     /// * `Return(t: t)` stops looping the terminal action and returns `t`.
     /// * `Retry(msg: String)` loops the terminal action with the additional
     ///     message `s` below the original information.
@@ -11,6 +11,9 @@ namespace SmartTerminal {
         case Retry(String)
     }
 
+    ///
+    /// Defines the layout of the `prompt` method.
+    ///
     pub enum Layout {
         case OneLine, MultiLine
     }
@@ -40,10 +43,11 @@ namespace SmartTerminal {
     pub def prompt(
         ansi: Bool,
         layout: Layout,
-        text: String,
+        startHint: String,
         parser: String -> Output[t] \ ef,
-        startHint: String
+        text: String
     ): Result[t, String] \ {IO, ef} = {
+        let bar = String.repeat(5, "-");
         /// `extraMsg = ""` does not print an empty line
         def inner(extraMsg: String): Result[t, String] \ {IO, ef} = {
             if (ansi) Terminal.clearScreenAndReset() else ();
@@ -54,7 +58,7 @@ namespace SmartTerminal {
                     print(": ")
                 case MultiLine =>
                     if (text != "") println(text) else ();
-                    println(line());
+                    println(bar);
                     if (extraMsg != "") println(extraMsg) else ();
                     print("> ")
             };
@@ -74,13 +78,6 @@ namespace SmartTerminal {
         inner(startHint)
     }
 
-    /// Unsafely unpacks result types.
-    @Unsafe
-    pub def crash(r: Result[a, b]): a with ToString[b] = match r {
-        case Ok(v) => v
-        case Err(msg) => bug!("!!Crash!! ${msg}")
-    }
-
     pub def enterToContinue(
         ansi: Bool,
         layout: Layout,
@@ -89,39 +86,48 @@ namespace SmartTerminal {
         prompt(
             ansi,
             layout,
-            text,
+            "Press enter to continue",
             _ -> Return(),
-            "Press enter to continue"
+            text
+        )
+    }
+
+    pub def yesNo(
+        ansi: Bool,
+        layout: Layout,
+        text: String
+    ): Result[Bool, String] \ IO = {
+        choice(
+            ansi,
+            layout,
+            ("Y", () -> Return(true)) :: ("N", () -> Return(false)) :: Nil,
+            text
         )
     }
 
     /// Uses trim and is case-insensitive.
     /// If `items` functions return `Retry`, the string is prepended to a
     /// list of the items
-    pub def selectionPrompt(
+    pub def choice(
         ansi: Bool,
         layout: Layout,
-        text: String,
-        items: foldable[(String, Unit -> Output[t] \ ef)]
+        items: foldable[(String, Unit -> Output[t] \ ef)],
+        text: String
     ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
         use String.{trim, toLowerCase};
+
         let helpMsg = List.join(" | ", List.map(fst, Foldable.toList(items)));
         let parser = s0 -> {
             let s1 = trim(toLowerCase(s0));
-            match Foldable.findLeft(match (s, _) -> trim(toLowerCase(s)) == s1, items) {
+            def cmp(s) = trim(toLowerCase(s)) == s1;
+            match Foldable.findLeft(fst >> cmp, items) {
                 case None => Retry(helpMsg)
                 case Some((_, action)) => match action() {
-                        case Return(v)  => Return(v)
-                        case Retry("")  => Retry(helpMsg)
-                        case Retry(msg) => Retry("${msg}${helpMsg}")
-                    }
+                    case Return(v)  => Return(v)
+                    case Retry(msg) => Retry("${msg}${helpMsg}")
+                }
             }
         };
-        prompt(ansi, layout, text, parser, helpMsg)
-    }
-
-    def line(): String = {
-        let barLength = 5;
-        String.repeat(barLength, "-")
+        prompt(ansi, layout, helpMsg, parser, text)
     }
 }

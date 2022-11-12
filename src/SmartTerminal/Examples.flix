@@ -1,61 +1,48 @@
 namespace SmartTerminal/Examples {
-    use SmartTerminal.crash
+    use SmartTerminal.choice
     use SmartTerminal.enterToContinue
     use SmartTerminal.prompt
-    use SmartTerminal.selectionPrompt
+    use SmartTerminal.yesNo
+    use SmartTerminal/Util.crash
+    use SmartTerminal/Util.resOutput
+    use SmartTerminal/Util.flatten
 
-    def ansi(): Bool = true
+    def ansi(): Result[Bool, String] \ IO = {
+        use SmartTerminal.Layout.{OneLine, MultiLine};
+        yesNo(
+            false,
+            OneLine,
+            "Do you want to enable ANSI?"
+        )
+    }
 
-    pub def fileName(): String \ IO = {
+    pub def fileName(): Unit \ IO = {
         use SmartTerminal.Output.{Return, Retry};
         use SmartTerminal.Layout.{OneLine, MultiLine};
 
-        crash(prompt(
-            ansi(),
+        let ansi = crash(ansi());
+        discard prompt(
+            ansi,
             MultiLine,
-            "Write the file name you'd like to save as (including extension).",
+            "",
             s0 -> match String.trim(s0) {
                 case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
                     Return(s)
                 case _ => Retry("Try something like 'something123.txt'")
             },
-            ""
-        ))
-    }
-
-    pub def yesNo(): Unit \ IO = {
-        use SmartTerminal.Output.{Return, Retry};
-        use SmartTerminal.Layout.{OneLine, MultiLine};
-
-        let coolTimes = 13;
-        crash(selectionPrompt(
-            ansi(),
-            OneLine,
-            "Do you want to print 'cool'${coolTimes} times?",
-            (
-                "y",
-                () -> {
-                    if (ansi()) Terminal.clearScreenAndReset() else ();
-                    List.range(0, coolTimes) |>
-                        List.foreach(_ -> println("cool"));
-                    Return()
-                }
-            ) :: (
-                "n",
-                upcast () -> Return()
-            ) ::
-            Nil
-        ))
+            "Write the file name you'd like to save as (including extension)."
+        )
     }
 
     pub def nestedPrompt(): Unit \ IO = {
         use SmartTerminal.Output.{Return, Retry};
         use SmartTerminal.Layout.{OneLine, MultiLine};
 
+        let ansi = crash(ansi());
         def helpPrompt() = crash(prompt(
-            ansi(),
+            ansi,
             MultiLine,
-            "Okay, if you really want help I will need at least 20 cool letters",
+            "",
             s0 -> match s0 {
                 case "" =>
                     Retry("I'm waiting...")
@@ -65,22 +52,22 @@ namespace SmartTerminal/Examples {
                     Retry("That doesn't look like 20 to me.")
                 case _ =>
                     crash(enterToContinue(
-                        ansi(),
+                        ansi,
                         MultiLine,
                         "Alright, those are pretty cool. The best candy is blue jeans."
                     ));
                     Return()
             },
-            ""
+            "Okay, if you really want help I will need at least 20 cool letters"
         ));
 
-        crash(prompt(
-            ansi(),
+        discard prompt(
+            ansi,
             MultiLine,
-            "What is the best candy?\n(try 'help' for help)",
+            "",
             s0 -> match String.toLowerCase(String.trim(s0)) {
                 case "blue jeans" =>
-                    if (ansi()) Terminal.clearScreenAndReset() else ();
+                    if (ansi) Terminal.clearScreenAndReset() else ();
                     println("You are entirely correct! Well done.");
                     Return()
                 case "help" =>
@@ -90,32 +77,68 @@ namespace SmartTerminal/Examples {
                     Retry("You gotta type something man.")
                 case _ => Retry("Incorrect, stupid!")
             },
-            ""
-        ))
+            "What is the best candy?\n(try 'help' for help)"
+        )
     }
 
     pub def areYouSure(): Unit \ IO = {
         use SmartTerminal.Output.{Return, Retry};
         use SmartTerminal.Layout.{OneLine, MultiLine};
 
-        def areYouSurePrompt(choice) = crash(selectionPrompt(
-            ansi(),
-            OneLine,
-            "Are you really sure it's ${choice}?",
-            ("y", () -> Return(Return())) ::
-            ("n", () -> Return(Retry(""))) ::
-            Nil
-        ));
+        let ansi = crash(ansi());
+        def areYouSurePrompt(lang) = {
+            let sure = crash(yesNo(
+                ansi,
+                OneLine,
+                "Are you really sure it's ${lang}?"
+            ));
+            if (sure) Return() else Retry("")
+        };
         def option(name) = (name, () -> areYouSurePrompt(name));
-        crash(selectionPrompt(
-            ansi(),
+        discard choice(
+            ansi,
             MultiLine,
-            "What is your favorite programming language?",
             List.map(option, List.sort(
                 "Flix" :: "Scala" :: "Haskell" :: "Java" ::
                 "Sml" :: Nil
-            ))
-        ))
+            )),
+            "What is your favorite programming language?"
+        )
     }
 
+    pub def resultThreading1(): Result[Int32, String] \ IO = {
+        use SmartTerminal.Output.{Return, Retry};
+        use SmartTerminal.Layout.{OneLine, MultiLine};
+        use Result.flatMap;
+
+        let hint = "integer";
+        let* ansi = ansi();
+        def intParser(s) = match Int32.fromString(String.trim(s)) {
+            case Some(v) =>
+                let res = {
+                    let* ans = yesNo(
+                        ansi,
+                        OneLine,
+                        "Are you committed to ${v}?"
+                    );
+                    if (ans) Ok(Return(v)) else Ok(Retry(hint))
+                };
+                resOutput(res)
+            case None => Retry(hint)
+        };
+        def intPrompt(text) = {
+            flatten(prompt(ansi, OneLine, hint, intParser, text))
+        };
+        let* _ = enterToContinue(
+            ansi,
+            MultiLine,
+            "You supply one number, then another, and I will add them together"
+        );
+        let* x = intPrompt("The first number");
+        let* y = intPrompt("The second number");
+        let sum = x + y;
+        let* _ = enterToContinue(ansi, OneLine, "${x} + ${y} = ${sum}");
+        Ok(sum)
+    }
 }
+
