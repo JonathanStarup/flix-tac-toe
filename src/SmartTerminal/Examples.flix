@@ -1,11 +1,12 @@
 namespace SmartTerminal/Examples {
     use SmartTerminal.choice
     use SmartTerminal.enterToContinue
+    use SmartTerminal.menu
     use SmartTerminal.prompt
     use SmartTerminal.yesNo
     use SmartTerminal/Util.crash
-    use SmartTerminal/Util.resOutput
     use SmartTerminal/Util.flatten
+    use SmartTerminal/Util.resOutput
 
     def ansi(): Result[Bool, String] \ IO = {
         use SmartTerminal.Layout.{OneLine, MultiLine};
@@ -98,6 +99,7 @@ namespace SmartTerminal/Examples {
         discard choice(
             ansi,
             MultiLine,
+            "",
             List.map(option, List.sort(
                 "Flix" :: "Scala" :: "Haskell" :: "Java" ::
                 "Sml" :: Nil
@@ -140,5 +142,48 @@ namespace SmartTerminal/Examples {
         let* _ = enterToContinue(ansi, OneLine, "${x} + ${y} = ${sum}");
         Ok(sum)
     }
-}
 
+    pub def calculator(): Unit \ IO = {
+        use SmartTerminal.Layout.{OneLine, MultiLine};
+        use SmartTerminal.StateOutput.{Return, Retry};
+        use SmartTerminal.Output.{Return => OReturn, Retry => ORetry};
+
+        let ansi = crash(ansi());
+        def intParser(s) = match Int32.fromString(String.trim(s)) {
+            case Some(v) => OReturn(v)
+            case None => ORetry("Must be an integer")
+        };
+        def intPrompt(msg) = {
+            crash(prompt(
+                ansi,
+                OneLine,
+                "Must be an integer",
+                intParser,
+                msg))
+        };
+
+        discard menu(
+            ansi,
+            MultiLine,
+            "",
+            0,
+            ("Add", n -> {
+                Retry("", n + intPrompt("Write a number to add to ${n}"))
+            }) ::
+                ("Subtract", n -> {
+                    Retry("", n - intPrompt("Write a number to subtract from ${n}"))
+                }) ::
+                ("Multiply", n -> {
+                    Retry("", n * intPrompt("Write a number to multiply with ${n}"))
+                }) ::
+                ("Divide", n -> {
+                    Retry("", n / intPrompt("Write a number to divide ${n} with"))
+                }) ::
+                ("Nothing", n -> {
+                    Return(println("Your final number was ${n: Int32}, good choice."))
+                }) ::
+                Nil,
+            n -> "What Do you want to do with your number: ${n}"
+        )
+    }
+}

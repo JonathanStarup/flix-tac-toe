@@ -68,15 +68,55 @@ namespace SmartTerminal {
                     Err(msg)
                 case Ok(input) =>
                     match parser(input) {
-                        case Return(output) =>
+                        case Output.Return(output) =>
                             Ok(output)
-                        case Retry(msg) =>
+                        case Output.Retry(msg) =>
                             inner(msg)
                     }
             }
         };
         inner(startHint)
     }
+
+    pub enum StateOutput[t, s] {
+        case Return(t)
+        case Retry(String, s)
+    }
+
+    pub def menu(
+        ansi: Bool,
+        layout: Layout,
+        startHint: String,
+        config: config,
+        items: foldable[(String, config -> StateOutput[t, config] \ ef)],
+        text: config -> String
+    ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
+        use Result.flatMap;
+
+        let itemList = Foldable.toList(items);
+        def adjustPair(conf) = match (item, f) -> {
+            (item, () -> Output.Return(f(conf)))
+        };
+        def inner(hint, conf) = {
+            let* output = choice(
+                ansi,
+                layout,
+                hint,
+                List.map(adjustPair(conf),
+                itemList),
+                text(conf)
+            );
+            match output {
+                case StateOutput.Return(v) => Ok(v)
+                case StateOutput.Retry(msg, conf1) => inner(msg, conf1)
+            }
+        };
+        inner(startHint, config)
+    }
+
+    // -------------------------------------------------------------------------
+    // Shorthand Defs ----------------------------------------------------------
+    // -------------------------------------------------------------------------
 
     pub def enterToContinue(
         ansi: Bool,
@@ -87,7 +127,7 @@ namespace SmartTerminal {
             ansi,
             layout,
             "Press enter to continue",
-            _ -> Return(),
+            _ -> Output.Return(),
             text
         )
     }
@@ -100,17 +140,25 @@ namespace SmartTerminal {
         choice(
             ansi,
             layout,
-            ("Y", () -> Return(true)) :: ("N", () -> Return(false)) :: Nil,
+            "",
+            ("y", () -> Output.Return(true)) ::
+                ("n", () -> Output.Return(false)) ::
+                Nil,
             text
         )
     }
 
+    ///
     /// Uses trim and is case-insensitive.
     /// If `items` functions return `Retry`, the string is prepended to a
     /// list of the items
+    ///
+    /// hint: use `upcast` if you combine pure `items` with impure ones.
+    ///
     pub def choice(
         ansi: Bool,
         layout: Layout,
+        startHint: String,
         items: foldable[(String, Unit -> Output[t] \ ef)],
         text: String
     ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
@@ -119,15 +167,15 @@ namespace SmartTerminal {
         let helpMsg = List.join(" | ", List.map(fst, Foldable.toList(items)));
         let parser = s0 -> {
             let s1 = trim(toLowerCase(s0));
-            def cmp(s) = trim(toLowerCase(s)) == s1;
-            match Foldable.findLeft(fst >> cmp, items) {
-                case None => Retry(helpMsg)
+            let choiceMatch = fst >> trim >> toLowerCase >> Eq.eq(s1);
+            match Foldable.findLeft(choiceMatch, items) {
+                case None => Output.Retry(helpMsg)
                 case Some((_, action)) => match action() {
-                    case Return(v)  => Return(v)
-                    case Retry(msg) => Retry("${msg}${helpMsg}")
+                    case Output.Return(v)  => Output.Return(v)
+                    case Output.Retry(msg) => Output.Retry("${msg}${helpMsg}")
                 }
             }
         };
-        prompt(ansi, layout, helpMsg, parser, text)
+        prompt(ansi, layout, "${startHint}${helpMsg}", parser, text)
     }
 }
