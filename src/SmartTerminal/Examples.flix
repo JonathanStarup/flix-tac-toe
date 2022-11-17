@@ -4,27 +4,34 @@ namespace SmartTerminal/Examples {
     use SmartTerminal.menu
     use SmartTerminal.prompt
     use SmartTerminal.yesNo
+    use SmartTerminal/Formatting.multiLine
+    use SmartTerminal/Formatting.oneLine
+    use SmartTerminal/Parsing.wordMatch
     use SmartTerminal/Util.crash
     use SmartTerminal/Util.flatten
+    use SmartTerminal/Util.mapOutput
+    use SmartTerminal/Util.mapStateOutput
+    use SmartTerminal/Util.optOutput
+    use SmartTerminal/Util.optStateOutput
     use SmartTerminal/Util.resOutput
+    use SmartTerminal/Util.resStateOutput
 
-    def ansi(): Result[Bool, String] \ IO = {
-        use SmartTerminal.Layout.{OneLine, MultiLine};
+    pub def ansiPrompt(): Result[Bool, String] \ IO = {
         yesNo(
             false,
-            OneLine,
-            "Do you want to enable ANSI?"
+            oneLine(),
+            "Do you want to enable ANSI use?"
         )
     }
 
-    pub def fileName(): Unit \ IO = {
+    pub def fileName(): Result[String, String] \ IO = {
+        use Result.flatMap;
         use SmartTerminal.Output.{Return, Retry};
-        use SmartTerminal.Layout.{OneLine, MultiLine};
 
-        let ansi = crash(ansi());
-        discard prompt(
+        let* ansi = ansiPrompt();
+        prompt(
             ansi,
-            MultiLine,
+            multiLine(),
             "",
             s0 -> match String.trim(s0) {
                 case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
@@ -37,12 +44,11 @@ namespace SmartTerminal/Examples {
 
     pub def nestedPrompt(): Unit \ IO = {
         use SmartTerminal.Output.{Return, Retry};
-        use SmartTerminal.Layout.{OneLine, MultiLine};
 
-        let ansi = crash(ansi());
+        let ansi = crash(ansiPrompt());
         def helpPrompt() = crash(prompt(
             ansi,
-            MultiLine,
+            multiLine(),
             "",
             s0 -> match s0 {
                 case "" =>
@@ -54,7 +60,7 @@ namespace SmartTerminal/Examples {
                 case _ =>
                     crash(enterToContinue(
                         ansi,
-                        MultiLine,
+                        multiLine(),
                         "Alright, those are pretty cool. The best candy is blue jeans."
                     ));
                     Return()
@@ -64,7 +70,7 @@ namespace SmartTerminal/Examples {
 
         discard prompt(
             ansi,
-            MultiLine,
+            multiLine(),
             "",
             s0 -> match String.toLowerCase(String.trim(s0)) {
                 case "blue jeans" =>
@@ -84,13 +90,12 @@ namespace SmartTerminal/Examples {
 
     pub def areYouSure(): Unit \ IO = {
         use SmartTerminal.Output.{Return, Retry};
-        use SmartTerminal.Layout.{OneLine, MultiLine};
 
-        let ansi = crash(ansi());
+        let ansi = crash(ansiPrompt());
         def areYouSurePrompt(lang) = {
             let sure = crash(yesNo(
                 ansi,
-                OneLine,
+                oneLine(),
                 "Are you really sure it's ${lang}?"
             ));
             if (sure) Return() else Retry("")
@@ -98,29 +103,29 @@ namespace SmartTerminal/Examples {
         def option(name) = (name, () -> areYouSurePrompt(name));
         discard choice(
             ansi,
-            MultiLine,
+            multiLine(),
             "",
             List.map(option, List.sort(
                 "Flix" :: "Scala" :: "Haskell" :: "Java" ::
                 "Sml" :: Nil
             )),
+            " | ",
             "What is your favorite programming language?"
         )
     }
 
     pub def resultThreading1(): Result[Int32, String] \ IO = {
         use SmartTerminal.Output.{Return, Retry};
-        use SmartTerminal.Layout.{OneLine, MultiLine};
         use Result.flatMap;
 
         let hint = "integer";
-        let* ansi = ansi();
+        let* ansi = ansiPrompt();
         def intParser(s) = match Int32.fromString(String.trim(s)) {
             case Some(v) =>
                 let res = {
                     let* ans = yesNo(
                         ansi,
-                        OneLine,
+                        oneLine(),
                         "Are you committed to ${v}?"
                     );
                     if (ans) Ok(Return(v)) else Ok(Retry(hint))
@@ -129,26 +134,25 @@ namespace SmartTerminal/Examples {
             case None => Retry(hint)
         };
         def intPrompt(text) = {
-            flatten(prompt(ansi, OneLine, hint, intParser, text))
+            flatten(prompt(ansi, oneLine(), hint, intParser, text))
         };
         let* _ = enterToContinue(
             ansi,
-            MultiLine,
+            multiLine(),
             "You supply one number, then another, and I will add them together"
         );
         let* x = intPrompt("The first number");
         let* y = intPrompt("The second number");
         let sum = x + y;
-        let* _ = enterToContinue(ansi, OneLine, "${x} + ${y} = ${sum}");
+        let* _ = enterToContinue(ansi, oneLine(), "${x} + ${y} = ${sum}");
         Ok(sum)
     }
 
     pub def calculator(): Unit \ IO = {
-        use SmartTerminal.Layout.{OneLine, MultiLine};
         use SmartTerminal.StateOutput.{Return, Retry};
         use SmartTerminal.Output.{Return => OReturn, Retry => ORetry};
 
-        let ansi = crash(ansi());
+        let ansi = crash(ansiPrompt());
         def intParser(s) = match Int32.fromString(String.trim(s)) {
             case Some(v) => OReturn(v)
             case None => ORetry("Must be an integer")
@@ -156,7 +160,7 @@ namespace SmartTerminal/Examples {
         def intPrompt(msg) = {
             crash(prompt(
                 ansi,
-                OneLine,
+                oneLine(),
                 "Must be an integer",
                 intParser,
                 msg))
@@ -164,7 +168,7 @@ namespace SmartTerminal/Examples {
 
         discard menu(
             ansi,
-            MultiLine,
+            multiLine(),
             "",
             0,
             ("Add", n -> {
@@ -183,7 +187,87 @@ namespace SmartTerminal/Examples {
                     Return(println("Your final number was ${n: Int32}, good choice."))
                 }) ::
                 Nil,
+            " | ",
             n -> "What Do you want to do with your number: ${n}"
         )
+    }
+
+    /// WIP
+    pub def settingsMenu(): Result[String, String] \ IO = {
+        use SmartTerminal.StateOutput.{Return, Retry};
+        use Result.flatMap;
+
+        let* ansi = ansiPrompt();
+
+        let changeA = ("A", settings -> {
+            let res = prompt(
+                ansi,
+                oneLine(),
+                "integer",
+                String.trim >>
+                    Int32.fromString >>
+                    optOutput("integer"),
+                "Change A from ${settings.a}"
+            );
+            res |>
+                Result.map(n -> Retry("", {a = n | settings})) |>
+                resStateOutput
+        });
+        let changeB = ("B", settings -> {
+            def threeLetter(s) = {
+                if (String.isMatch(regex = "[A-Za-z][A-Za-z][A-Za-z]", s))
+                    Some(s)
+                else None
+            };
+            let res = prompt(
+                ansi,
+                oneLine(),
+                "must be 3 letters",
+                String.trim >>
+                    threeLetter >>
+                    optOutput("must be 3 letters"),
+                "Change B from ${settings.b}"
+            );
+            res |>
+                Result.map(n -> Retry("", {b = n | settings})) |>
+                resStateOutput
+        });
+        let changeC = ("C", settings -> {
+            def boolFromString(s) = match s {
+                case "true" => Some(true)
+                case "false" => Some(false)
+                case _ => None
+            };
+            let res = prompt(
+                ansi,
+                oneLine(),
+                "true/false",
+                String.trim >>
+                    boolFromString >>
+                    optOutput("true/false"),
+                "Change C from ${settings.c}"
+            );
+            res |>
+                Result.map(b -> Retry("", {c = b | settings})) |>
+                resStateOutput
+        });
+        let quit = ("quit", settings -> Return(Ok(settings)) as \ IO);
+
+        let finalSettings = flatten(menu(
+            ansi,
+            multiLine(),
+            "",
+            {a = 0, b = "aAa", c = false},
+            changeA :: changeB :: changeC :: quit :: Nil,
+            " | ",
+            settings -> String.unlines(
+                "Current settings:" ::
+                "  A = ${settings.a}" ::
+                "  B = ${settings.b}" ::
+                "  C = ${settings.c}" ::
+                Nil
+            )
+        ));
+        finalSettings |> Result.map(stringify)
     }
 }
