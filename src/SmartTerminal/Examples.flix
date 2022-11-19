@@ -1,4 +1,5 @@
 namespace SmartTerminal/Examples {
+    use SmartTerminal.ansiPrompt
     use SmartTerminal.choice
     use SmartTerminal.enterToX
     use SmartTerminal.menu
@@ -15,14 +16,6 @@ namespace SmartTerminal/Examples {
     use SmartTerminal/Util.optStateOutput
     use SmartTerminal/Util.resOutput
     use SmartTerminal/Util.resStateOutput
-
-    pub def ansiPrompt(): Result[Bool, String] \ IO = {
-        yesNo(
-            false,
-            oneLine(),
-            "Do you want to enable ANSI use?"
-        )
-    }
 
     pub def fileName(): Result[String, String] \ IO = {
         use Result.flatMap;

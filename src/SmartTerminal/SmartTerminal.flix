@@ -230,4 +230,17 @@ namespace SmartTerminal {
             text
         )
     }
+
+    pub def ansiPrompt(): Result[Bool, String] \ IO = {
+        use String.{lineSeparator => ls};
+        yesNo(
+            false,
+            SmartTerminal/Formatting.multiLine(), List.join("",
+                "Do you want to enable ANSI?" ::
+                ls() :: ls() ::
+                "if the folliwing text is bold, then ANSI works:" ::
+                " ${Console.bold("bold")}" :: Nil
+            )
+        )
+    }
 }

@@ -1,4 +1,5 @@
 namespace Cli/TicTacToe {
+    use Cli.Res
     use SmartTerminal.choice
     use SmartTerminal.enterToX
     use SmartTerminal.Output
@@ -18,8 +19,6 @@ namespace Cli/TicTacToe {
     use TicTacToe.placePiece
     use TicTacToe.positionFromString
     use TicTacToe.Winner
-
-    pub type alias Res = Result[Unit, String]
 
     pub def play(ansi: Bool): Res \ IO = {
         use Result.flatMap;
@@ -58,6 +57,7 @@ namespace Cli/TicTacToe {
 
     def playWith(ansi: Bool, starting: Piece): Res \ IO = {
         use String.{lineSeparator => ls};
+        let break = ls() + ls();
         let quitOrElse = wordMatch(
             "(exit|quit|forfeit|back)",
             () -> _ -> StateOutput.Return(Ok()) as \ IO
@@ -74,11 +74,11 @@ namespace Cli/TicTacToe {
                             let c1 = {p = otherPiece(c.p), b = b1};
                             StateOutput.Retry("", c1)
                         case Winner.PieceWin(winner) =>
-                            ending("${winner} has won!${ls()}${boardString(b1)}")
+                            ending("${winner} has won!${break}${boardString(b1)}")
                         case Winner.BothWin =>
-                            ending("Both players.. win?${ls()}${boardString(b1)}")
+                            ending("Both players.. win?${break}${boardString(b1)}")
                         case Winner.Stuck =>
-                            ending("A stalemate!${ls()}${boardString(b1)}")
+                            ending("A stalemate!${break}${boardString(b1)}")
                     }
                 case None =>
                     StateOutput.Retry("Sorry, didn't understand that", c)
@@ -86,7 +86,7 @@ namespace Cli/TicTacToe {
                     StateOutput.Retry("That position is already occupied", c)
             })
         );
-        def rep(c) = "${c.p} to play${ls()}${boardString(c.b)}";
+        def rep(c) = "${c.p} to play${break}${boardString(c.b)}";
         statePrompt(
             ansi,
             multiLine(),
