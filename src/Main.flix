@@ -1,1 +1,1 @@
-pub def main(): Unit \ IO = TicTacToe/CLI.play()
+pub def main(): Unit \ IO = discard Cli/TicTacToe.play(true)

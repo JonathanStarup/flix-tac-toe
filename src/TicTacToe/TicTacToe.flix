@@ -1,5 +1,7 @@
 namespace TicTacToe {
 
+    pub type alias Position = Int32
+
     pub enum Piece with Eq {
         case X
         case O
@@ -9,6 +11,16 @@ namespace TicTacToe {
         pub def toString(x: Piece): String = match x {
             case X => "X"
             case O => "O"
+        }
+    }
+
+    instance FromString[Piece] {
+        pub def fromString(x: String): Option[Piece] = {
+            match String.toLowerCase(String.trim(x)) {
+                case "x" => Some(X)
+                case "o" => Some(O)
+                case _   => None
+            }
         }
     }
 
@@ -45,7 +57,7 @@ namespace TicTacToe {
         (None, None, None)
     )
 
-    pub def available(i: Int32, b: Board): Bool = {
+    pub def available(i: Position, b: Board): Bool = {
         let ((b1, b2, b3), (b4, b5, b6), (b7, b8, b9)) = b;
         match i {
             case 1 => b1 == None
@@ -62,7 +74,7 @@ namespace TicTacToe {
     }
 
     /// Will ignore placements on occupied places
-    pub def placePiece(p: Piece, i: Int32, b: Board): Board = {
+    pub def placePiece(p: Piece, i: Position, b: Board): Board = {
         let ((b1, b2, b3), (b4, b5, b6), (b7, b8, b9)) = b;
         def place(bb) = bb |> Option.getWithDefault(p) |> Some;
         match i {
@@ -76,6 +88,39 @@ namespace TicTacToe {
             case 8 => ((b1, b2, b3), (b4, b5, b6), (b7, place(b8), b9))
             case 9 => ((b1, b2, b3), (b4, b5, b6), (b7, b8, place(b9)))
             case _ => b
+        }
+    }
+
+    pub def positionFromString(s: String): Option[Position] = {
+        use String.{trim, toLowerCase, isMatch};
+        def pairPattern(s1, s2, input) =
+            isMatch(regex = "(${s1} *${s2}|${s2} *${s1})", input);
+        match trim(toLowerCase(s)) {
+            case s1 if isMatch(regex = "+?[1-9]", s1) => Int32.fromString(s1)
+            case "up" => Some(2)
+            case "down" => Some(8)
+            case "left" => Some(4)
+            case "right" => Some(6)
+            case s1 if pairPattern("up", "right", s1) => Some(3)
+            case s1 if pairPattern("up", "left", s1) => Some(1)
+            case s1 if pairPattern("down", "right", s1) => Some(9)
+            case s1 if pairPattern("down", "left", s1) => Some(7)
+            case "top" => Some(2)
+            case s1 if pairPattern("top", "right", s1) => Some(3)
+            case s1 if pairPattern("top", "left", s1) => Some(1)
+            case s1 if isMatch(regex = "(mid|middle)", s1) => Some(5)
+            case s1 if isMatch(regex = "(bot|bottom)", s1) => Some(8)
+            case s1 if pairPattern("(bot|bottom)", "right", s1) => Some(9)
+            case s1 if pairPattern("(bot|bottom)", "left", s1) => Some(7)
+            case s1 if isMatch(regex = "(n|north)", s1) => Some(2)
+            case s1 if isMatch(regex = "(e|east)", s1) => Some(6)
+            case s1 if isMatch(regex = "(s|south)", s1) => Some(8)
+            case s1 if isMatch(regex = "(w|west)", s1) => Some(4)
+            case s1 if pairPattern("(n|north)", "(e|east)", s1) => Some(3)
+            case s1 if pairPattern("(n|north)", "(w|west)", s1) => Some(1)
+            case s1 if pairPattern("(s|south)", "(e|east)", s1) => Some(9)
+            case s1 if pairPattern("(s|south)", "(w|west)", s1) => Some(7)
+            case _ => None
         }
     }
 

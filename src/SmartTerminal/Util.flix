@@ -27,6 +27,12 @@ namespace SmartTerminal/Util {
         }
     }
 
+    /// Uses bold if `ansi` is true, otherwise returns the argument.
+    pub def emph(ansi: Bool, s: String): String = match ansi {
+        case true => Console.bold(s)
+        case false => s
+    }
+
     ///
     /// Extracts an output from a result. Useful for nested prompts.
     ///

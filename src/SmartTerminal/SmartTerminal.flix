@@ -23,21 +23,21 @@ namespace SmartTerminal {
     pub def prompt(
         ansi: Bool,
         formatter: Formatter,
-        startHint: String,
+        startHint: {startHint = String},
         parser: String -> Output[t] \ ef,
         text: String
     ): Result[t, String] \ {IO, ef} = {
         use Result.flatMap;
 
         if (ansi) Terminal.clearScreenAndReset() else ();
-        print(formatter({text = text, info = startHint}));
+        print(formatter({text = text, info = startHint.startHint}));
         let* line = Console.readLine();
         let parserOutput = parser(line);
         match parserOutput {
             case Output.Return(output) =>
                 Ok(output)
             case Output.Retry(msg) =>
-                prompt(ansi, formatter, msg, parser, text)
+                prompt(ansi, formatter, startHint = msg, parser, text)
         }
     }
 
@@ -49,7 +49,7 @@ namespace SmartTerminal {
     pub def statePrompt(
         ansi: Bool,
         formatter: Formatter,
-        startHint: String,
+        startHint: {startHint = String},
         config: config,
         parser: (String, config) -> StateOutput[t, config] \ ef1,
         text: config -> String \ ef2
@@ -57,14 +57,14 @@ namespace SmartTerminal {
         use Result.flatMap;
 
         if (ansi) Terminal.clearScreenAndReset() else ();
-        print(formatter({text = text(config), info = startHint}));
+        print(formatter({text = text(config), info = startHint.startHint}));
         let* line = Console.readLine();
         let parserOutput = parser(line, config);
         match parserOutput {
             case StateOutput.Return(output) =>
                 Ok(output)
             case StateOutput.Retry(msg, config1) =>
-                statePrompt(ansi, formatter, msg, config1, parser, text)
+                statePrompt(ansi, formatter, startHint = msg, config1, parser, text)
         }
     }
 
@@ -96,11 +96,11 @@ namespace SmartTerminal {
     namespace Parsing {
 
         pub def wordMatch(
-            w: String,
+            regex: String,
             ifWord: Unit -> t \ ef1,
             otherwise: String -> t \ ef2
         ): String -> t \ {ef1, ef2} = s0 -> {
-            if (s0 == w) {
+            if (String.isMatch(regex = regex, s0)) {
                 ifWord()
             } else {
                 otherwise(s0)
@@ -124,15 +124,17 @@ namespace SmartTerminal {
     // Shorthand Defs ----------------------------------------------------------
     // -------------------------------------------------------------------------
 
-    pub def enterToContinue(
+    /// `"Press enter to ${x}"`
+    pub def enterToX(
         ansi: Bool,
         formatter: Formatter,
+        x: {x = String},
         text: String
     ): Result[Unit, String] \ IO = {
         prompt(
             ansi,
             formatter,
-            "Press enter to continue",
+            startHint = "Press enter to ${x.x}",
             _ -> Output.Return(),
             text
         )
@@ -145,11 +147,11 @@ namespace SmartTerminal {
     ): Result[Bool, String] \ IO = choice(
         ansi,
         formatter,
-        "",
+        startHint = "",
         ("y", () -> Output.Return(true)) ::
             ("n", () -> Output.Return(false)) ::
             Nil,
-        "/",
+        delim = "/",
         text
     )
 
@@ -163,9 +165,9 @@ namespace SmartTerminal {
     pub def choice(
         ansi: Bool,
         formatter: Formatter,
-        startHint: String,
+        startHint: {startHint = String},
         items: foldable[(String, Unit -> Output[t] \ ef)],
-        delim: String,
+        delim: {delim = String},
         text: String
     ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
         use Foldable.join;
@@ -174,22 +176,28 @@ namespace SmartTerminal {
         use String.{trim, toLowerCase};
 
         let itemList = Foldable.toList(items);
-        let helpMsg = join(delim, map(fst, itemList));
+        let helpMsg = join(delim.delim, map(fst, itemList));
         let items1 = itemList |> map(match (s, a) -> (trim(toLowerCase(s)), a));
         let parser =
             trim >>
             toLowerCase >>
             choice(items1, () -> Output.Retry(helpMsg));
-        prompt(ansi, formatter, "${startHint}${helpMsg}", parser, text)
+        prompt(
+            ansi,
+            formatter,
+            startHint = "${startHint.startHint}${helpMsg}",
+            parser,
+            text
+        )
     }
 
     pub def menu(
         ansi: Bool,
         formatter: Formatter,
-        startHint: String,
+        startHint: {startHint = String},
         config: config,
         items: foldable[(String, config -> StateOutput[t, config] \ ef)],
-        delim: String,
+        delim: {delim = String},
         text: config -> String
     ): Result[t, String] \ {IO, ef} with Foldable[foldable] = {
         use Foldable.join;
@@ -200,7 +208,7 @@ namespace SmartTerminal {
         use SmartTerminal.StateOutput.{Return, Retry};
 
         let itemList = Foldable.toList(items);
-        let helpMsg = join(delim, map(fst, itemList));
+        let helpMsg = join(delim.delim, map(fst, itemList));
         let items1 = itemList |> map(match (s, a) -> (
             trim(toLowerCase(s)),
             () -> conf -> match a(conf) {
@@ -216,7 +224,7 @@ namespace SmartTerminal {
         statePrompt(
             ansi,
             formatter,
-            "${startHint}${helpMsg}",
+            startHint = "${startHint.startHint}${helpMsg}",
             config,
             parser,
             text

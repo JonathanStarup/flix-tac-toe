@@ -1,6 +1,6 @@
 namespace SmartTerminal/Examples {
     use SmartTerminal.choice
-    use SmartTerminal.enterToContinue
+    use SmartTerminal.enterToX
     use SmartTerminal.menu
     use SmartTerminal.prompt
     use SmartTerminal.yesNo
@@ -32,7 +32,7 @@ namespace SmartTerminal/Examples {
         prompt(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             s0 -> match String.trim(s0) {
                 case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
                     Return(s)
@@ -49,7 +49,7 @@ namespace SmartTerminal/Examples {
         def helpPrompt() = crash(prompt(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             s0 -> match s0 {
                 case "" =>
                     Retry("I'm waiting...")
@@ -58,9 +58,10 @@ namespace SmartTerminal/Examples {
                 case s if not (String.length(s) >= 20) =>
                     Retry("That doesn't look like 20 to me.")
                 case _ =>
-                    crash(enterToContinue(
+                    crash(enterToX(
                         ansi,
                         multiLine(),
+                        x = "continue",
                         "Alright, those are pretty cool. The best candy is blue jeans."
                     ));
                     Return()
@@ -71,7 +72,7 @@ namespace SmartTerminal/Examples {
         discard prompt(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             s0 -> match String.toLowerCase(String.trim(s0)) {
                 case "blue jeans" =>
                     if (ansi) Terminal.clearScreenAndReset() else ();
@@ -104,12 +105,12 @@ namespace SmartTerminal/Examples {
         discard choice(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             List.map(option, List.sort(
                 "Flix" :: "Scala" :: "Haskell" :: "Java" ::
                 "Sml" :: Nil
             )),
-            " | ",
+            delim = " | ",
             "What is your favorite programming language?"
         )
     }
@@ -134,17 +135,18 @@ namespace SmartTerminal/Examples {
             case None => Retry(hint)
         };
         def intPrompt(text) = {
-            flatten(prompt(ansi, oneLine(), hint, intParser, text))
+            flatten(prompt(ansi, oneLine(), startHint = hint, intParser, text))
         };
-        let* _ = enterToContinue(
+        let* _ = enterToX(
             ansi,
             multiLine(),
+            x = "start",
             "You supply one number, then another, and I will add them together"
         );
         let* x = intPrompt("The first number");
         let* y = intPrompt("The second number");
         let sum = x + y;
-        let* _ = enterToContinue(ansi, oneLine(), "${x} + ${y} = ${sum}");
+        let* _ = enterToX(ansi, oneLine(), x = "exit", "${x} + ${y} = ${sum}");
         Ok(sum)
     }
 
@@ -161,7 +163,7 @@ namespace SmartTerminal/Examples {
             crash(prompt(
                 ansi,
                 oneLine(),
-                "Must be an integer",
+                startHint = "Must be an integer",
                 intParser,
                 msg))
         };
@@ -169,7 +171,7 @@ namespace SmartTerminal/Examples {
         discard menu(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             0,
             ("Add", n -> {
                 Retry("", n + intPrompt("Write a number to add to ${n}"))
@@ -187,7 +189,7 @@ namespace SmartTerminal/Examples {
                     Return(println("Your final number was ${n: Int32}, good choice."))
                 }) ::
                 Nil,
-            " | ",
+            delim = " | ",
             n -> "What Do you want to do with your number: ${n}"
         )
     }
@@ -203,7 +205,7 @@ namespace SmartTerminal/Examples {
             let res = prompt(
                 ansi,
                 oneLine(),
-                "integer",
+                startHint = "integer",
                 String.trim >>
                     Int32.fromString >>
                     optOutput("integer"),
@@ -222,7 +224,7 @@ namespace SmartTerminal/Examples {
             let res = prompt(
                 ansi,
                 oneLine(),
-                "must be 3 letters",
+                startHint = "must be 3 letters",
                 String.trim >>
                     threeLetter >>
                     optOutput("must be 3 letters"),
@@ -241,7 +243,7 @@ namespace SmartTerminal/Examples {
             let res = prompt(
                 ansi,
                 oneLine(),
-                "true/false",
+                startHint = "true/false",
                 String.trim >>
                     boolFromString >>
                     optOutput("true/false"),
@@ -256,10 +258,10 @@ namespace SmartTerminal/Examples {
         let finalSettings = flatten(menu(
             ansi,
             multiLine(),
-            "",
+            startHint = "",
             {a = 0, b = "aAa", c = false},
             changeA :: changeB :: changeC :: quit :: Nil,
-            " | ",
+            delim = " | ",
             settings -> String.unlines(
                 "Current settings:" ::
                 "  A = ${settings.a}" ::
