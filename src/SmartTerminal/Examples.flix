@@ -1,15 +1,18 @@
 namespace SmartTerminal/Examples {
+    use Functor.map
+    use Result.flatten
     use SmartTerminal.ansiPrompt
     use SmartTerminal.choice
     use SmartTerminal.enterToX
     use SmartTerminal.menu
+    use SmartTerminal.Output
     use SmartTerminal.prompt
+    use SmartTerminal.StateOutput
     use SmartTerminal.yesNo
     use SmartTerminal/Formatting.multiLine
     use SmartTerminal/Formatting.oneLine
     use SmartTerminal/Parsing.wordMatch
     use SmartTerminal/Util.crash
-    use SmartTerminal/Util.flatten
     use SmartTerminal/Util.mapOutput
     use SmartTerminal/Util.mapStateOutput
     use SmartTerminal/Util.optOutput
@@ -19,25 +22,20 @@ namespace SmartTerminal/Examples {
 
     pub def fileName(): Result[String, String] \ IO = {
         use Result.flatMap;
-        use SmartTerminal.Output.{Return, Retry};
 
         let* ansi = ansiPrompt();
-        prompt(
-            ansi,
-            multiLine(),
-            startHint = "",
-            s0 -> match String.trim(s0) {
-                case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
-                    Return(s)
-                case _ => Retry("Try something like 'something123.txt'")
-            },
-            "Write the file name you'd like to save as (including extension)."
-        )
+        let text =
+            "Write the file name you'd like to save as (including extension).";
+        def parser(s0) = match String.trim(s0) {
+            case s if String.isMatch(regex = "[A-Za-z0-9]+(\\.[A-Za-z]+)+", s) =>
+                Output.Return(s)
+            case _ =>
+                Output.Retry("Try something like 'something123.txt'")
+        };
+        prompt(ansi, multiLine(), startHint = "", parser, text)
     }
 
     pub def nestedPrompt(): Unit \ IO = {
-        use SmartTerminal.Output.{Return, Retry};
-
         let ansi = crash(ansiPrompt());
         def helpPrompt() = crash(prompt(
             ansi,
@@ -45,11 +43,11 @@ namespace SmartTerminal/Examples {
             startHint = "",
             s0 -> match s0 {
                 case "" =>
-                    Retry("I'm waiting...")
+                    Output.Retry("I'm waiting...")
                 case s if not String.isMatch(regex = "[A-Za-z]*", s) =>
-                    Retry("I said letters buddy.")
+                    Output.Retry("I said letters buddy.")
                 case s if not (String.length(s) >= 20) =>
-                    Retry("That doesn't look like 20 to me.")
+                    Output.Retry("That doesn't look like 20 to me.")
                 case _ =>
                     crash(enterToX(
                         ansi,
@@ -57,7 +55,7 @@ namespace SmartTerminal/Examples {
                         x = "continue",
                         "Alright, those are pretty cool. The best candy is blue jeans."
                     ));
-                    Return()
+                    Output.Return()
             },
             "Okay, if you really want help I will need at least 20 cool letters"
         ));
@@ -70,21 +68,20 @@ namespace SmartTerminal/Examples {
                 case "blue jeans" =>
                     if (ansi) Terminal.clearScreenAndReset() else ();
                     println("You are entirely correct! Well done.");
-                    Return()
+                    Output.Return()
                 case "help" =>
                     helpPrompt();
-                    Retry("")
+                    Output.Retry("")
                 case "" =>
-                    Retry("You gotta type something man.")
-                case _ => Retry("Incorrect, stupid!")
+                    Output.Retry("You gotta type something man.")
+                case _ =>
+                    Output.Retry("Incorrect, stupid!")
             },
             "What is the best candy?\n(try 'help' for help)"
         )
     }
 
     pub def areYouSure(): Unit \ IO = {
-        use SmartTerminal.Output.{Return, Retry};
-
         let ansi = crash(ansiPrompt());
         def areYouSurePrompt(lang) = {
             let sure = crash(yesNo(
@@ -92,14 +89,14 @@ namespace SmartTerminal/Examples {
                 oneLine(),
                 "Are you really sure it's ${lang}?"
             ));
-            if (sure) Return() else Retry("")
+            if (sure) Output.Return() else Output.Retry("")
         };
         def option(name) = (name, () -> areYouSurePrompt(name));
         discard choice(
             ansi,
             multiLine(),
             startHint = "",
-            List.map(option, List.sort(
+            map(option, List.sort(
                 "Flix" :: "Scala" :: "Haskell" :: "Java" ::
                 "Sml" :: Nil
             )),
@@ -109,23 +106,23 @@ namespace SmartTerminal/Examples {
     }
 
     pub def resultThreading1(): Result[Int32, String] \ IO = {
-        use SmartTerminal.Output.{Return, Retry};
         use Result.flatMap;
 
         let hint = "integer";
         let* ansi = ansiPrompt();
         def intParser(s) = match Int32.fromString(String.trim(s)) {
             case Some(v) =>
-                let res = {
-                    let* ans = yesNo(
-                        ansi,
-                        oneLine(),
-                        "Are you committed to ${v}?"
-                    );
-                    if (ans) Ok(Return(v)) else Ok(Retry(hint))
-                };
-                resOutput(res)
-            case None => Retry(hint)
+                let res = yesNo(
+                    ansi,
+                    oneLine(),
+                    "Are you committed to ${v}?"
+                );
+                res |>
+                    Result.map(b ->
+                        if (b) Output.Return(v) else Output.Retry(hint)
+                    ) |>
+                    resOutput
+            case None => Output.Retry(hint)
         };
         def intPrompt(text) = {
             flatten(prompt(ansi, oneLine(), startHint = hint, intParser, text))
@@ -144,13 +141,10 @@ namespace SmartTerminal/Examples {
     }
 
     pub def calculator(): Unit \ IO = {
-        use SmartTerminal.StateOutput.{Return, Retry};
-        use SmartTerminal.Output.{Return => OReturn, Retry => ORetry};
-
         let ansi = crash(ansiPrompt());
         def intParser(s) = match Int32.fromString(String.trim(s)) {
-            case Some(v) => OReturn(v)
-            case None => ORetry("Must be an integer")
+            case Some(v) => Output.Return(v)
+            case None => Output.Retry("Must be an integer")
         };
         def intPrompt(msg) = {
             crash(prompt(
@@ -167,19 +161,19 @@ namespace SmartTerminal/Examples {
             startHint = "",
             0,
             ("Add", n -> {
-                Retry("", n + intPrompt("Write a number to add to ${n}"))
+                StateOutput.Retry("", n + intPrompt("Write a number to add to ${n}"))
             }) ::
                 ("Subtract", n -> {
-                    Retry("", n - intPrompt("Write a number to subtract from ${n}"))
+                    StateOutput.Retry("", n - intPrompt("Write a number to subtract from ${n}"))
                 }) ::
                 ("Multiply", n -> {
-                    Retry("", n * intPrompt("Write a number to multiply with ${n}"))
+                    StateOutput.Retry("", n * intPrompt("Write a number to multiply with ${n}"))
                 }) ::
                 ("Divide", n -> {
-                    Retry("", n / intPrompt("Write a number to divide ${n} with"))
+                    StateOutput.Retry("", n / intPrompt("Write a number to divide ${n} with"))
                 }) ::
                 ("Nothing", n -> {
-                    Return(println("Your final number was ${n: Int32}, good choice."))
+                    StateOutput.Return(println("Your final number was ${n: Int32}, good choice."))
                 }) ::
                 Nil,
             delim = " | ",
@@ -189,7 +183,6 @@ namespace SmartTerminal/Examples {
 
     /// WIP
     pub def settingsMenu(): Result[String, String] \ IO = {
-        use SmartTerminal.StateOutput.{Return, Retry};
         use Result.flatMap;
 
         let* ansi = ansiPrompt();
@@ -205,7 +198,7 @@ namespace SmartTerminal/Examples {
                 "Change A from ${settings.a}"
             );
             res |>
-                Result.map(n -> Retry("", {a = n | settings})) |>
+                Result.map(n -> StateOutput.Retry("", {a = n | settings})) |>
                 resStateOutput
         });
         let changeB = ("B", settings -> {
@@ -224,7 +217,7 @@ namespace SmartTerminal/Examples {
                 "Change B from ${settings.b}"
             );
             res |>
-                Result.map(n -> Retry("", {b = n | settings})) |>
+                Result.map(n -> StateOutput.Retry("", {b = n | settings})) |>
                 resStateOutput
         });
         let changeC = ("C", settings -> {
@@ -243,10 +236,10 @@ namespace SmartTerminal/Examples {
                 "Change C from ${settings.c}"
             );
             res |>
-                Result.map(b -> Retry("", {c = b | settings})) |>
+                Result.map(b -> StateOutput.Retry("", {c = b | settings})) |>
                 resStateOutput
         });
-        let quit = ("quit", settings -> Return(Ok(settings)) as \ IO);
+        let quit = ("quit", settings -> StateOutput.Return(Ok(settings)) as \ IO);
 
         let finalSettings = flatten(menu(
             ansi,
@@ -263,6 +256,8 @@ namespace SmartTerminal/Examples {
                 Nil
             )
         ));
-        finalSettings |> Result.map(stringify)
+        finalSettings |> Result.map(config ->
+            "a = ${config.a}\nb = ${config.b}\nc = ${config.c}"
+        )
     }
 }
